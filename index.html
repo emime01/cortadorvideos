@@ -40,7 +40,23 @@ h1 em{font-style:normal;color:var(--accent)}
 .vmeta{font-size:12px;color:var(--text3);margin-top:2px}
 .vchange{margin-left:auto;font-size:12px;color:var(--text3);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .vchange:hover{color:var(--text2)}
-.cfg{margin-top:28px}
+
+/* Preview scrubber */
+.preview-wrap{display:none;margin-top:16px;background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden}
+.preview-wrap.show{display:block}
+.preview-video-row{position:relative;width:100%;background:#000}
+.preview-video-row video{width:100%;max-height:200px;display:block;object-fit:contain}
+.preview-overlay{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.6);border-radius:6px;padding:4px 10px;font-size:12px;color:#fff;font-family:monospace}
+.scrubber-area{padding:16px 20px 20px}
+.scrubber-label{font-size:12px;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
+.scrubber-row{display:flex;align-items:center;gap:12px}
+.scrubber-row input[type=range]{flex:1;height:4px;background:var(--bg3);outline:none;border:none;accent-color:var(--accent);cursor:pointer}
+.start-display{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--accent);min-width:48px;text-align:right}
+.start-unit{font-size:12px;color:var(--text3);margin-left:2px}
+.scrubber-hint{font-size:12px;color:var(--text3);margin-top:8px}
+.scrubber-hint strong{color:var(--text2)}
+
+.cfg{margin-top:24px}
 .slabel{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
 .cgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:520px){.cgrid{grid-template-columns:1fr}}
@@ -49,7 +65,8 @@ h1 em{font-style:normal;color:var(--accent)}
 .ccard label{font-size:12px;color:var(--text3);display:block;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
 .bnum{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;line-height:1}
 .bunit{font-size:14px;color:var(--text3);margin-left:4px;font-weight:300}
-input[type=range]{width:100%;height:4px;background:var(--bg3);outline:none;border:none;margin-top:10px;accent-color:var(--accent);cursor:pointer}
+input[type=range]{accent-color:var(--accent);cursor:pointer}
+.dur-slider{width:100%;height:4px;background:var(--bg3);outline:none;border:none;margin-top:10px}
 .trow{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
 .trow span{font-size:13px;color:var(--text2)}
 .tog{position:relative;width:38px;height:22px;cursor:pointer}
@@ -58,8 +75,8 @@ input[type=range]{width:100%;height:4px;background:var(--bg3);outline:none;borde
 .ts::before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:var(--text3);border-radius:50%;transition:transform .2s,background .2s}
 .tog input:checked+.ts{background:rgba(124,255,155,.15);border-color:rgba(124,255,155,.4)}
 .tog input:checked+.ts::before{transform:translateX(16px);background:var(--accent)}
-.gr{font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(124,255,155,.1);color:var(--accent);border:1px solid rgba(124,255,155,.2);margin-left:6px;font-weight:500}
 .gr-ai{font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(0,212,255,.08);color:var(--accent2);border:1px solid rgba(0,212,255,.2);margin-left:6px;font-weight:500}
+
 .mbtn{margin-top:24px;width:100%;padding:16px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;background:var(--accent);color:#0a0a0f;border:none;border-radius:var(--radius);cursor:pointer;transition:opacity .15s,transform .1s;overflow:hidden;position:relative}
 .mbtn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);transform:translateX(-100%);transition:transform .5s}
 .mbtn:not(:disabled):hover::after{transform:translateX(100%)}
@@ -86,7 +103,7 @@ input[type=range]{width:100%;height:4px;background:var(--bg3);outline:none;borde
 .segthumb-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px}
 .seginfo{flex:1;min-width:0}
 .segname{font-weight:500;font-size:14px;margin-bottom:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.client-badge{font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);color:var(--accent2);font-weight:500;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.client-badge{font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);color:var(--accent2);font-weight:500;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
 .segmeta{font-size:12px;color:var(--text3)}
 .segpill{font-size:11px;background:var(--bg3);border:1px solid var(--border);padding:3px 8px;border-radius:6px;color:var(--text2);white-space:nowrap}
 .segbtn{padding:8px 18px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
@@ -115,184 +132,326 @@ footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);displ
 <body>
 <canvas id="aC" style="display:none;width:320px;height:180px"></canvas>
 <video id="anaVid" muted style="display:none"></video>
+
 <div class="wrap">
   <header>
-    <div class="logo">CortaClip<em>.</em><small>v6</small></div>
+    <div class="logo">CortaClip<em>.</em><small>v7</small></div>
     <div class="hbadge">FFmpeg + Claude AI</div>
   </header>
   <div class="statusbar" id="statusbar"></div>
+
   <h1>Cortá tus videos<br>de <em>forma automática</em></h1>
-  <p class="sub">Subí el video, detectamos los cortes y el nombre de cada cliente con IA. Los segmentos se descargan en MP4 perfecto.</p>
+  <p class="sub">Subí el video, ajustá el segundo de inicio, y cortamos cada 10 segundos desde ahí. El cliente se detecta con IA.</p>
+
   <div class="drop" id="drop">
     <input type="file" id="fileIn" accept="video/*">
     <div class="drop-icon">🎬</div>
     <div class="drop-title">Arrastrá tu video acá</div>
-    <div class="drop-hint">o <span>hacé clic para seleccionar</span></div>
+    <div class="drop-hint">o <span>hacé clic para seleccionar</span> — MP4, MOV, AVI</div>
   </div>
+
   <div class="vinfo" id="vinfo">
     <div class="vicon">🎞</div>
     <div style="flex:1;min-width:0"><div class="vname" id="vname"></div><div class="vmeta" id="vmeta"></div></div>
     <div class="vchange" id="vchange">Cambiar</div>
   </div>
+
+  <!-- Preview + scrubber to pick start time -->
+  <div class="preview-wrap" id="previewWrap">
+    <div class="preview-video-row">
+      <video id="previewVid" muted playsinline></video>
+      <div class="preview-overlay" id="previewTime">0:00</div>
+    </div>
+    <div class="scrubber-area">
+      <div class="scrubber-label">Ajustá el segundo de inicio del primer segmento</div>
+      <div class="scrubber-row">
+        <input type="range" id="startSlider" min="0" max="60" step="0.1" value="0">
+        <span class="start-display" id="startVal">0.0</span><span class="start-unit">s</span>
+      </div>
+      <div class="scrubber-hint">Mové el slider hasta ver el inicio del <strong>primer anuncio</strong>. El resto se corta cada 10s desde ahí.</div>
+    </div>
+  </div>
+
   <div class="cfg">
     <div class="slabel">Configuración</div>
     <div class="cgrid">
       <div class="ccard">
         <label>Duración por segmento</label>
         <div><span class="bnum" id="durVal">10</span><span class="bunit">segundos</span></div>
-        <input type="range" min="5" max="60" step="1" value="10" id="durSlider">
+        <input class="dur-slider" type="range" min="5" max="60" step="1" value="10" id="durSlider">
       </div>
       <div class="ccard">
-        <label>Opciones <span class="gr">frame negro</span> <span class="gr-ai">IA cliente</span></label>
-        <div class="trow" style="margin-top:8px"><span>Detectar frame negro</span><label class="tog"><input type="checkbox" id="blackMode" checked><span class="ts"></span></label></div>
-        <div class="trow"><span>Detectar cliente con IA</span><label class="tog"><input type="checkbox" id="aiMode" checked><span class="ts"></span></label></div>
+        <label>Detección de cliente <span class="gr-ai">IA</span></label>
+        <div style="font-size:13px;color:var(--text3);line-height:1.55;margin-top:4px">Claude analiza cada segmento y detecta el nombre del cliente o marca automáticamente</div>
+        <div class="trow">
+          <span>Activar detección con IA</span>
+          <label class="tog"><input type="checkbox" id="aiMode" checked><span class="ts"></span></label>
+        </div>
       </div>
     </div>
   </div>
+
   <button class="mbtn" id="analyzeBtn" disabled>Seleccioná un video para comenzar</button>
+
   <div class="pgwrap" id="pgwrap">
-    <div class="pghead"><span class="pglabel" id="pglabel">Analizando...</span><span class="pgpct" id="pgpct">0%</span></div>
+    <div class="pghead"><span class="pglabel" id="pglabel">Procesando...</span><span class="pgpct" id="pgpct">0%</span></div>
     <div class="pgbg"><div class="pgfill" id="pgfill"></div></div>
   </div>
+
   <div class="res" id="res">
-    <div class="reshead"><div class="restitle">Segmentos detectados</div><div class="rescnt" id="rescnt">0 segmentos</div></div>
+    <div class="reshead"><div class="restitle">Segmentos</div><div class="rescnt" id="rescnt">0 segmentos</div></div>
     <div class="seglist" id="seglist"></div>
-    <div class="dlaWrap" id="dlaWrap" style="display:none"><button class="dlabtn" id="dlabtn">Descargar todos los segmentos</button></div>
-    <div class="note"><strong>Upload único + corte paralelo:</strong> el video se sube una sola vez y todos los segmentos se cortan al mismo tiempo con FFmpeg. El cliente se detecta con Claude Vision leyendo el logo o texto de cada segmento.</div>
+    <div class="dlaWrap" id="dlaWrap" style="display:none"><button class="dlabtn" id="dlabtn">⬇ Descargar todos</button></div>
+    <div class="note"><strong>Corte preciso con FFmpeg:</strong> todos los segmentos se cortan en paralelo desde el segundo que elegiste. El nombre del cliente se detecta automáticamente con Claude Vision.</div>
   </div>
-  <footer><span>CortaClip v6 — FFmpeg + Claude Vision</span><span>Videos borrados tras el corte</span></footer>
+
+  <footer><span>CortaClip v7 — FFmpeg + Claude Vision</span><span>Videos borrados tras el corte</span></footer>
 </div>
+
 <script>
-const API=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://localhost:5050':'';
-const drop=document.getElementById('drop'),fileIn=document.getElementById('fileIn'),analyzeBtn=document.getElementById('analyzeBtn'),durSlider=document.getElementById('durSlider'),anaVid=document.getElementById('anaVid'),aC=document.getElementById('aC'),aCtx=aC.getContext('2d');
-let videoFile=null,segments=[],videoURL=null,sessionId=null,hasClaude=false;
+const API = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1' ? 'http://localhost:5050' : '';
+const drop=document.getElementById('drop'), fileIn=document.getElementById('fileIn');
+const analyzeBtn=document.getElementById('analyzeBtn'), durSlider=document.getElementById('durSlider');
+const anaVid=document.getElementById('anaVid'), previewVid=document.getElementById('previewVid');
+const startSlider=document.getElementById('startSlider');
+const aC=document.getElementById('aC'), aCtx=aC.getContext('2d');
+let videoFile=null, segments=[], videoURL=null, sessionId=null, hasClaude=false;
+
+// Health check
 fetch(API+'/health').then(r=>r.json()).then(d=>{
-  const sb=document.getElementById('statusbar');sb.style.display='flex';hasClaude=d.claude;
+  const sb=document.getElementById('statusbar'); sb.style.display='flex'; hasClaude=d.claude;
   sb.className=d.ffmpeg?'statusbar ok':'statusbar warn';
   sb.innerHTML=`<div class="sdot"></div> Servidor activo · FFmpeg ${d.ffmpeg?'listo':'no encontrado'} · Claude ${d.claude?'activo':'no configurado'}`;
-  if(!d.claude)document.getElementById('aiMode').checked=false;
+  if(!d.claude) document.getElementById('aiMode').checked=false;
 }).catch(()=>{});
+
 durSlider.oninput=()=>document.getElementById('durVal').textContent=durSlider.value;
+
+// Start time slider — scrubs preview video
+startSlider.oninput=()=>{
+  const v=parseFloat(startSlider.value);
+  document.getElementById('startVal').textContent=v.toFixed(1);
+  previewVid.currentTime=v;
+};
+
+previewVid.ontimeupdate=()=>{
+  const s=previewVid.currentTime;
+  document.getElementById('previewTime').textContent=fmt(s);
+};
+
 drop.onclick=()=>fileIn.click();
 document.getElementById('vchange').onclick=()=>fileIn.click();
 drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
 drop.ondragleave=()=>drop.classList.remove('over');
 drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');handleFile(e.dataTransfer.files[0])};
 fileIn.onchange=()=>handleFile(fileIn.files[0]);
+
 function handleFile(file){
   if(!file||!file.type.startsWith('video/'))return;
-  videoFile=file;if(videoURL)URL.revokeObjectURL(videoURL);
-  videoURL=URL.createObjectURL(file);anaVid.src=videoURL;
+  videoFile=file;
+  if(videoURL)URL.revokeObjectURL(videoURL);
+  videoURL=URL.createObjectURL(file);
+  anaVid.src=videoURL;
+  previewVid.src=videoURL;
   anaVid.onloadedmetadata=()=>{
+    const dur=anaVid.duration;
     document.getElementById('vinfo').classList.add('show');
     document.getElementById('vname').textContent=file.name;
-    document.getElementById('vmeta').textContent=`${fmt(anaVid.duration)} • ${(file.size/1024/1024).toFixed(1)} MB`;
-    analyzeBtn.disabled=false;analyzeBtn.textContent='Analizar y cortar →';
+    document.getElementById('vmeta').textContent=`${fmt(dur)} • ${(file.size/1024/1024).toFixed(1)} MB`;
+    // Setup start slider max = duration - segDur
+    startSlider.max=Math.max(0,(dur-parseFloat(durSlider.value)).toFixed(1));
+    startSlider.value=0;
+    document.getElementById('startVal').textContent='0.0';
+    document.getElementById('previewWrap').classList.add('show');
+    analyzeBtn.disabled=false;
+    analyzeBtn.textContent='Cortar video →';
     document.getElementById('res').classList.remove('show');
-    document.getElementById('pgwrap').classList.remove('show');sessionId=null;
+    document.getElementById('pgwrap').classList.remove('show');
+    sessionId=null;
   };
 }
+
+// Update slider max when dur changes
+durSlider.oninput=()=>{
+  document.getElementById('durVal').textContent=durSlider.value;
+  if(anaVid.duration){
+    startSlider.max=Math.max(0,(anaVid.duration-parseFloat(durSlider.value)).toFixed(1));
+  }
+};
+
 function fmt(s){return`${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
-function setPg(pct,msg){document.getElementById('pgfill').style.width=pct+'%';document.getElementById('pglabel').textContent=msg;document.getElementById('pgpct').textContent=Math.round(pct)+'%'}
+function setPg(pct,msg){
+  document.getElementById('pgfill').style.width=pct+'%';
+  document.getElementById('pglabel').textContent=msg;
+  document.getElementById('pgpct').textContent=Math.round(pct)+'%';
+}
+
 analyzeBtn.onclick=async()=>{
   if(!videoFile)return;
-  analyzeBtn.disabled=true;segments=[];
+  analyzeBtn.disabled=true;
+  segments=[];
   document.getElementById('pgwrap').classList.add('show');
   document.getElementById('res').classList.remove('show');
-  aC.width=320;aC.height=180;
-  const dur=anaVid.duration,segDur=parseInt(durSlider.value);
-  const useBlack=document.getElementById('blackMode').checked;
-  const useAI=document.getElementById('aiMode').checked&&hasClaude;
+  aC.width=320; aC.height=180;
+
+  const dur=anaVid.duration;
+  const segDur=parseFloat(durSlider.value);
+  const startAt=parseFloat(startSlider.value);
+  const useAI=document.getElementById('aiMode').checked && hasClaude;
+
+  // Build fixed segments from startAt every segDur seconds
+  for(let t=startAt; t<dur; t+=segDur){
+    segments.push({start:parseFloat(t.toFixed(3)), end:parseFloat(Math.min(t+segDur,dur).toFixed(3))});
+  }
+  // Remove last segment if it's too short (less than half segDur)
+  if(segments.length>1 && (segments[segments.length-1].end - segments[segments.length-1].start) < segDur*0.4){
+    segments.pop();
+  }
+
   try{
-    // Step 1: Upload once
-    setPg(5,'Subiendo video (solo una vez)...');
-    const fd=new FormData();fd.append('video',videoFile,videoFile.name);
+    // Step 1: Upload
+    setPg(5,'Subiendo video al servidor...');
+    const fd=new FormData();
+    fd.append('video',videoFile,videoFile.name);
     const uploadData=await new Promise((resolve,reject)=>{
-      const xhr=new XMLHttpRequest();xhr.open('POST',API+'/upload');
+      const xhr=new XMLHttpRequest();
+      xhr.open('POST',API+'/upload');
       xhr.upload.onprogress=e=>{if(e.lengthComputable)setPg(5+Math.round((e.loaded/e.total)*40),`Subiendo... ${Math.round((e.loaded/e.total)*100)}%`)};
-      xhr.onload=()=>xhr.status===200?resolve(JSON.parse(xhr.responseText)):reject(new Error(JSON.parse(xhr.responseText).error||'Error'));
-      xhr.onerror=()=>reject(new Error('Error de red'));xhr.send(fd);
+      xhr.onload=()=>xhr.status===200?resolve(JSON.parse(xhr.responseText)):reject(new Error(JSON.parse(xhr.responseText).error||'Error al subir'));
+      xhr.onerror=()=>reject(new Error('Error de red'));
+      xhr.send(fd);
     });
     sessionId=uploadData.session_id;
-    // Step 2: Build segments
-    setPg(50,'Calculando segmentos...');
-    if(useBlack&&uploadData.black_frames&&uploadData.black_frames.length>0){
-      const blacks=uploadData.black_frames,cuts=[0];
-      blacks.forEach(b=>{const mid=(b.start+b.end)/2;if(mid-cuts[cuts.length-1]>2)cuts.push(mid)});
-      cuts.push(uploadData.duration);
-      for(let i=0;i<cuts.length-1;i++)segments.push({start:cuts[i],end:cuts[i+1]});
-      const refined=[];
-      for(const seg of segments){const len=seg.end-seg.start;if(len>segDur*1.8){const n=Math.round(len/segDur),sub=len/n;for(let j=0;j<n;j++)refined.push({start:seg.start+j*sub,end:seg.start+(j+1)*sub})}else refined.push(seg)}
-      segments=refined;
-    }else{for(let t=0;t<dur;t+=segDur)segments.push({start:t,end:Math.min(t+segDur,dur)})}
-    // Step 3: Cut all in parallel
-    setPg(55,`Cortando ${segments.length} segmentos en paralelo...`);
-    const cutPayload=segments.map((seg,i)=>({start:seg.start,end:seg.end,index:i+1}));
-    const cutResp=await fetch(API+'/cut_all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId,segments:cutPayload})});
+
+    // Step 2: Cut all in parallel
+    setPg(50,`Cortando ${segments.length} segmentos en paralelo...`);
+    const cutPayload=segments.map((seg,i)=>({start:seg.start, end:seg.end, index:i+1}));
+    const cutResp=await fetch(API+'/cut_all',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:sessionId, segments:cutPayload})
+    });
+    if(!cutResp.ok){
+      const err=await cutResp.json().catch(()=>({}));
+      throw new Error(err.error||'Error al cortar');
+    }
     const cutData=await cutResp.json();
-    segments.forEach((seg,i)=>{seg.index=i+1;seg.ready=cutData.results&&cutData.results[String(i+1)]&&cutData.results[String(i+1)].ok});
-    // Step 4: Previews
+    segments.forEach((seg,i)=>{
+      seg.index=i+1;
+      seg.ready=cutData.results&&cutData.results[String(i+1)]&&cutData.results[String(i+1)].ok;
+    });
+
+    // Step 3: Previews
     setPg(75,'Generando miniaturas...');
     await buildPreviews();
-    // Step 5: AI client detection
-    if(useAI){setPg(85,'Identificando clientes con IA...');await identifyAll()}
+
+    // Step 4: AI identification
+    if(useAI){
+      setPg(85,'Identificando clientes con IA...');
+      await identifyAll();
+    }
+
     setPg(100,`Listo — ${segments.length} segmentos cortados`);
     renderResults();
-  }catch(e){console.error(e);alert('Error: '+e.message)}
-  analyzeBtn.disabled=false;analyzeBtn.textContent='Volver a analizar';
+
+  }catch(e){
+    console.error(e);
+    alert('Error: '+e.message);
+  }
+  analyzeBtn.disabled=false;
+  analyzeBtn.textContent='Volver a cortar';
 };
-async function buildPreviews(){for(let i=0;i<segments.length;i++)segments[i].preview=await captureFrame((segments[i].start+segments[i].end)/2)}
+
+async function buildPreviews(){
+  for(let i=0;i<segments.length;i++){
+    segments[i].preview=await captureFrame((segments[i].start+segments[i].end)/2);
+  }
+}
+
 async function identifyAll(){
   for(let i=0;i<segments.length;i+=3){
     const batch=segments.slice(i,i+3);
     await Promise.all(batch.map(seg=>identifyClient(seg)));
-    setPg(85+Math.round(((i+3)/segments.length)*10),`Identificando clientes... ${Math.min(i+3,segments.length)}/${segments.length}`);
+    setPg(85+Math.round(((i+3)/segments.length)*12),`Identificando clientes... ${Math.min(i+3,segments.length)}/${segments.length}`);
   }
 }
+
 async function identifyClient(seg){
   if(!seg.preview)return;
   try{
-    const r=await fetch(API+'/identify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId,index:seg.index,frame:seg.preview})});
-    const d=await r.json();seg.client=d.client||'';
+    const r=await fetch(API+'/identify',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:sessionId, index:seg.index, frame:seg.preview})
+    });
+    const d=await r.json();
+    seg.client=d.client||'';
   }catch(e){seg.client=''}
 }
-async function captureFrame(t){return new Promise(res=>{anaVid.currentTime=t;anaVid.onseeked=()=>{aCtx.drawImage(anaVid,0,0,320,180);res(aC.toDataURL('image/jpeg',.85))}})}
-function setPg(pct,msg){document.getElementById('pgfill').style.width=pct+'%';document.getElementById('pglabel').textContent=msg;document.getElementById('pgpct').textContent=Math.round(pct)+'%'}
+
+async function captureFrame(t){
+  return new Promise(res=>{
+    anaVid.currentTime=t;
+    anaVid.onseeked=()=>{aCtx.drawImage(anaVid,0,0,320,180);res(aC.toDataURL('image/jpeg',.85))};
+  });
+}
+
 function renderResults(){
-  const list=document.getElementById('seglist');list.innerHTML='';
+  const list=document.getElementById('seglist');
+  list.innerHTML='';
   document.getElementById('res').classList.add('show');
   document.getElementById('rescnt').textContent=`${segments.length} segmento${segments.length!==1?'s':''}`;
   segments.forEach((seg,i)=>{
-    const row=document.createElement('div');row.className='segrow';row.style.animationDelay=(i*.04)+'s';
-    const clientHtml=seg.client?`<span class="client-badge" title="${seg.client}">${seg.client}</span>`:'';
-    row.innerHTML=`<div class="segn">${String(i+1).padStart(2,'0')}</div>
+    const row=document.createElement('div');
+    row.className='segrow';
+    row.style.animationDelay=(i*.04)+'s';
+    const clientHtml=seg.client&&seg.client!=='Desconocido'?`<span class="client-badge" title="${seg.client}">${seg.client}</span>`:'';
+    row.innerHTML=`
+      <div class="segn">${String(i+1).padStart(2,'0')}</div>
       <div class="segthumb">${seg.preview?`<img src="${seg.preview}">`:'<div class="segthumb-ph">🎞</div>'}</div>
-      <div class="seginfo"><div class="segname">Segmento ${i+1} ${clientHtml}</div><div class="segmeta">${(seg.end-seg.start).toFixed(1)}s</div></div>
-      <div class="segpill">${fmt(seg.start)} → ${fmt(seg.end)}</div>
+      <div class="seginfo">
+        <div class="segname">Segmento ${i+1} ${clientHtml}</div>
+        <div class="segmeta">${(seg.end-seg.start).toFixed(1)}s · ${fmt(seg.start)} → ${fmt(seg.end)}</div>
+      </div>
       <div class="segdot ${seg.ready?'ready':''}" id="dot${i}"></div>
-      <button class="segbtn ${seg.ready?'ready':''}" id="btn${i}" onclick="doDownload(${i})" ${seg.ready?'':'disabled'}>${seg.ready?'Descargar':'No disponible'}</button>`;
+      <button class="segbtn ${seg.ready?'ready':''}" id="btn${i}" onclick="doDownload(${i})" ${seg.ready?'':'disabled'}>${seg.ready?'Descargar':'Error'}</button>`;
     list.appendChild(row);
   });
-  if(segments.filter(s=>s.ready).length>1){document.getElementById('dlaWrap').style.display='block';document.getElementById('dlabtn').onclick=downloadAll}
+  const readyCount=segments.filter(s=>s.ready).length;
+  if(readyCount>1){
+    document.getElementById('dlaWrap').style.display='block';
+    document.getElementById('dlabtn').onclick=downloadAll;
+  }
 }
+
 window.doDownload=async(i)=>{
-  const seg=segments[i];if(!seg.ready||!sessionId)return;
-  const btn=document.getElementById('btn'+i),dot=document.getElementById('dot'+i);
-  btn.disabled=true;btn.className='segbtn cutting';btn.textContent='Descargando...';dot.className='segdot cutting';
+  const seg=segments[i];
+  if(!seg.ready||!sessionId)return;
+  const btn=document.getElementById('btn'+i), dot=document.getElementById('dot'+i);
+  btn.disabled=true; btn.className='segbtn cutting'; btn.textContent='Descargando...';
+  dot.className='segdot cutting';
   try{
     const r=await fetch(`${API}/download/${sessionId}/${seg.index}`);
-    if(!r.ok)throw new Error('Error al descargar');
-    const blob=await r.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');
+    if(!r.ok) throw new Error('Error al descargar');
+    const blob=await r.blob(), url=URL.createObjectURL(blob), a=document.createElement('a');
     const base=videoFile.name.replace(/\.[^.]+$/,'');
-    const clientName=seg.client?seg.client.replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'_'):'';
+    const clientName=seg.client&&seg.client!=='Desconocido'?seg.client.replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'_'):'';
     a.download=clientName?`${clientName}_segmento_${seg.index}.mp4`:`${base}_segmento_${seg.index}.mp4`;
-    a.href=url;a.click();setTimeout(()=>URL.revokeObjectURL(url),8000);
-    btn.textContent='✓ Descargado';btn.className='segbtn done';dot.className='segdot done';
-  }catch(e){btn.textContent='Descargar';btn.className='segbtn ready';btn.disabled=false;dot.className='segdot ready';alert('Error: '+e.message)}
+    a.href=url; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),8000);
+    btn.textContent='✓ Descargado'; btn.className='segbtn done';
+    dot.className='segdot done';
+  }catch(e){
+    btn.textContent='Descargar'; btn.className='segbtn ready'; btn.disabled=false;
+    dot.className='segdot ready';
+    alert('Error: '+e.message);
+  }
 };
+
 async function downloadAll(){
-  const dlabtn=document.getElementById('dlabtn');dlabtn.disabled=true;
+  const dlabtn=document.getElementById('dlabtn');
+  dlabtn.disabled=true;
   const ready=segments.filter(s=>s.ready);
   for(let i=0;i<ready.length;i++){
     dlabtn.textContent=`Descargando ${i+1} de ${ready.length}...`;
@@ -300,9 +459,8 @@ async function downloadAll(){
     await sleep(200);
   }
   dlabtn.textContent=`✓ Todos descargados (${ready.length})`;
-  if(sessionId)fetch(`${API}/cleanup/${sessionId}`,{method:'DELETE'}).catch(()=>{});
+  if(sessionId) fetch(`${API}/cleanup/${sessionId}`,{method:'DELETE'}).catch(()=>{});
 }
-function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 </script>
 </body>
 </html>
