@@ -64,7 +64,7 @@ def upload():
         duration = float(json.loads(pr.stdout)['format']['duration'])
 
         # Black frame detection
-        bd = run([FFMPEG, '-i', src, '-vf', 'blackdetect=d=0.05:pix_th=0.10',
+        bd = run([FFMPEG, '-i', src, '-vf', 'blackdetect=d=0.01:pix_th=0.08',
                   '-an', '-f', 'null', '-'], timeout=120)
         blacks = []
         for line in bd.stderr.split('\n'):
@@ -183,7 +183,7 @@ def identify():
     try:
         import urllib.request
         req_body = json.dumps({
-            'model': 'claude-opus-4-6',
+            'model': 'claude-sonnet-4-6',
             'max_tokens': 100,
             'messages': [{
                 'role': 'user',
