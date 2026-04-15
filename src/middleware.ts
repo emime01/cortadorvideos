@@ -1,7 +1,17 @@
-'use client'
+import { withAuth } from "next-auth/middleware"
+import { NextResponse } from "next/server"
 
-import { SessionProvider } from 'next-auth/react'
+export default withAuth(
+  function middleware(req) {
+    return NextResponse.next()
+  },
+  {
+    callbacks: {
+      authorized: ({ token }) => !!token,
+    },
+  }
+)
 
-export default function Providers({ children }: { children: React.ReactNode }) {
-  return <SessionProvider>{children}</SessionProvider>
+export const config = {
+  matcher: ["/dashboard/:path*"],
 }
