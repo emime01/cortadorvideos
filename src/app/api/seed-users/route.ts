@@ -21,16 +21,32 @@ export async function GET() {
 
   const results: { email: string; status: string; detail?: string }[] = []
 
-  for (const u of TEST_USERS) {
-    // Check if perfil already exists (by email lookup in auth)
-    const { data: existing } = await supabase
-      .from('perfiles')
-      .select('id, rol')
-      .eq('rol', u.rol)
-      .maybeSingle()
+  // Get all existing auth users once
+  const { data: { users: existingUsers } } = await supabase.auth.admin.listUsers()
+  const existingByEmail = new Map(existingUsers.map(u => [u.email, u]))
 
-    if (existing) {
-      results.push({ email: u.email, status: 'ya existe', detail: `perfil id: ${existing.id}` })
+  for (const u of TEST_USERS) {
+    const existingAuthUser = existingByEmail.get(u.email)
+
+    if (existingAuthUser) {
+      // Auth user exists — ensure they have exactly one perfil
+      const { data: perfiles } = await supabase
+        .from('perfiles')
+        .select('id')
+        .eq('user_id', existingAuthUser.id)
+
+      if (perfiles && perfiles.length > 0) {
+        results.push({ email: u.email, status: 'ya existe', detail: `perfil id: ${perfiles[0].id}` })
+      } else {
+        // Auth user exists but no perfil — create it
+        const { error: perfilError } = await supabase.from('perfiles').insert({
+          user_id: existingAuthUser.id,
+          nombre: u.nombre,
+          rol: u.rol,
+          porcentaje_comision: 6,
+        })
+        results.push({ email: u.email, status: perfilError ? `error perfil: ${perfilError.message}` : 'perfil creado ✓' })
+      }
       continue
     }
 
@@ -54,11 +70,10 @@ export async function GET() {
       porcentaje_comision: 6,
     })
 
-    if (perfilError) {
-      results.push({ email: u.email, status: 'error perfil', detail: perfilError.message })
-    } else {
-      results.push({ email: u.email, status: 'creado ✓' })
-    }
+    results.push({
+      email: u.email,
+      status: perfilError ? `error perfil: ${perfilError.message}` : 'creado ✓',
+    })
   }
 
   return NextResponse.json({

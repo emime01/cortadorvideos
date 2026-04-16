@@ -39,7 +39,8 @@ export const authOptions: NextAuthOptions = {
           .from("perfiles")
           .select("*")
           .eq("user_id", data.user.id)
-          .single()
+          .limit(1)
+          .maybeSingle()
 
         if (!perfil) return null
 
