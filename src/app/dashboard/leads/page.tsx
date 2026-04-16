@@ -13,10 +13,9 @@ export default async function LeadsPage() {
   const supabase = createServerClient()
   const rol = session.user.rol
   const userId = session.user.id
-
   const isGerente = rol === 'gerente_comercial'
 
-  let query = supabase
+  let leadsQuery = supabase
     .from('leads')
     .select(
       'id, descripcion, monto_potencial, cuatrimestre, estado, notas, created_at, clientes(nombre, empresa), agencias(nombre), perfiles!leads_vendedor_id_fkey(nombre)'
@@ -24,15 +23,24 @@ export default async function LeadsPage() {
     .order('created_at', { ascending: false })
 
   if (!isGerente) {
-    query = query.eq('vendedor_id', userId) as typeof query
+    leadsQuery = leadsQuery.eq('vendedor_id', userId) as typeof leadsQuery
   }
 
-  const { data: leads } = await query
+  const [{ data: leads }, { data: clientes }, vendedoresRes] = await Promise.all([
+    leadsQuery,
+    supabase.from('clientes').select('id, nombre, empresa').eq('activo', true).order('nombre'),
+    isGerente
+      ? supabase.from('perfiles').select('id, nombre').in('rol', ['vendedor', 'asistente_ventas']).eq('activo', true).order('nombre')
+      : Promise.resolve({ data: [] }),
+  ])
 
   return (
     <LeadsClient
       leads={leads ?? []}
       isGerente={isGerente}
+      userId={userId}
+      clientes={clientes ?? []}
+      vendedores={(vendedoresRes as any).data ?? []}
     />
   )
 }

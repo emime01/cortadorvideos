@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { Plus, X, Pencil } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,53 +40,20 @@ interface ColumnDef {
 interface Props {
   leads: LeadRow[]
   isGerente: boolean
+  userId: string
+  clientes: { id: string; nombre: string; empresa: string | null }[]
+  vendedores: { id: string; nombre: string }[]
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const COLUMNS: ColumnDef[] = [
-  {
-    estado: 'nuevo',
-    label: 'Nuevo',
-    headerBg: '#f4f3f0',
-    headerColor: '#6e6a62',
-    dotColor: '#9a9895',
-  },
-  {
-    estado: 'en_conversacion',
-    label: 'En conversación',
-    headerBg: '#eff6ff',
-    headerColor: '#1d4ed8',
-    dotColor: '#3b82f6',
-  },
-  {
-    estado: 'propuesta_enviada',
-    label: 'Propuesta enviada',
-    headerBg: '#fffbeb',
-    headerColor: '#92400e',
-    dotColor: '#f59e0b',
-  },
-  {
-    estado: 'negociacion',
-    label: 'Negociación',
-    headerBg: '#fef3ec',
-    headerColor: '#c45a10',
-    dotColor: '#eb691c',
-  },
-  {
-    estado: 'ganado',
-    label: 'Ganado',
-    headerBg: '#e6f7ef',
-    headerColor: '#166534',
-    dotColor: '#1a9a5e',
-  },
-  {
-    estado: 'perdido',
-    label: 'Perdido',
-    headerBg: '#fef0f0',
-    headerColor: '#991b1b',
-    dotColor: '#d63b3b',
-  },
+  { estado: 'nuevo', label: 'Nuevo', headerBg: '#f4f3f0', headerColor: '#6e6a62', dotColor: '#9a9895' },
+  { estado: 'en_conversacion', label: 'En conversación', headerBg: '#eff6ff', headerColor: '#1d4ed8', dotColor: '#3b82f6' },
+  { estado: 'propuesta_enviada', label: 'Propuesta enviada', headerBg: '#fffbeb', headerColor: '#92400e', dotColor: '#f59e0b' },
+  { estado: 'negociacion', label: 'Negociación', headerBg: '#fef3ec', headerColor: '#c45a10', dotColor: '#eb691c' },
+  { estado: 'ganado', label: 'Ganado', headerBg: '#e6f7ef', headerColor: '#166534', dotColor: '#1a9a5e' },
+  { estado: 'perdido', label: 'Perdido', headerBg: '#fef0f0', headerColor: '#991b1b', dotColor: '#d63b3b' },
 ]
 
 const QUARTER_OPTIONS = [
@@ -93,6 +61,15 @@ const QUARTER_OPTIONS = [
   { value: 'Q1-2026', label: 'Q1-2026' },
   { value: 'Q2-2026', label: 'Q2-2026' },
   { value: 'Q3-2026', label: 'Q3-2026' },
+]
+
+const ESTADO_OPTIONS: { value: EstadoLead; label: string }[] = [
+  { value: 'nuevo', label: 'Nuevo' },
+  { value: 'en_conversacion', label: 'En conversación' },
+  { value: 'propuesta_enviada', label: 'Propuesta enviada' },
+  { value: 'negociacion', label: 'Negociación' },
+  { value: 'ganado', label: 'Ganado' },
+  { value: 'perdido', label: 'Perdido' },
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -129,13 +106,357 @@ function truncate(str: string | null | undefined, max: number): string {
   return str.length > max ? str.slice(0, max) + '…' : str
 }
 
+// ─── Modal Form ───────────────────────────────────────────────────────────────
+
+interface ModalState {
+  open: boolean
+  lead: LeadRow | null
+}
+
+interface LeadFormValues {
+  clienteId: string
+  descripcion: string
+  montoPotencial: string
+  cuatrimestre: string
+  estado: EstadoLead
+  notas: string
+  motivoPerdida: string
+  vendedorId: string
+}
+
+function emptyForm(userId: string): LeadFormValues {
+  return {
+    clienteId: '',
+    descripcion: '',
+    montoPotencial: '',
+    cuatrimestre: 'Q1-2026',
+    estado: 'nuevo',
+    notas: '',
+    motivoPerdida: '',
+    vendedorId: userId,
+  }
+}
+
+function leadToForm(lead: LeadRow, userId: string): LeadFormValues {
+  const cli = getJoined(lead.clientes)
+  return {
+    clienteId: '',
+    descripcion: lead.descripcion ?? '',
+    montoPotencial: lead.monto_potencial != null ? String(lead.monto_potencial) : '',
+    cuatrimestre: lead.cuatrimestre ?? 'Q1-2026',
+    estado: (lead.estado as EstadoLead) ?? 'nuevo',
+    notas: lead.notas ?? '',
+    motivoPerdida: '',
+    vendedorId: userId,
+  }
+}
+
+function LeadModal({
+  modal,
+  onClose,
+  onSaved,
+  isGerente,
+  userId,
+  clientes,
+  vendedores,
+}: {
+  modal: ModalState
+  onClose: () => void
+  onSaved: () => void
+  isGerente: boolean
+  userId: string
+  clientes: Props['clientes']
+  vendedores: Props['vendedores']
+}) {
+  const isEdit = modal.lead != null
+  const [form, setForm] = useState<LeadFormValues>(() =>
+    isEdit ? leadToForm(modal.lead!, userId) : emptyForm(userId)
+  )
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function set<K extends keyof LeadFormValues>(key: K, val: LeadFormValues[K]) {
+    setForm(prev => ({ ...prev, [key]: val }))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    const body: Record<string, unknown> = {
+      clienteId: form.clienteId || undefined,
+      descripcion: form.descripcion || undefined,
+      montoPotencial: form.montoPotencial !== '' ? Number(form.montoPotencial) : null,
+      cuatrimestre: form.cuatrimestre || undefined,
+      estado: form.estado,
+      notas: form.notas || undefined,
+      motivoPerdida: form.estado === 'perdido' ? form.motivoPerdida || undefined : undefined,
+    }
+
+    if (isGerente && form.vendedorId) {
+      body.vendedorId = form.vendedorId
+    }
+
+    let res: Response
+    if (isEdit) {
+      res = await fetch(`/api/leads/${modal.lead!.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    } else {
+      res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    }
+
+    setSaving(false)
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setError(data.error ?? 'Error al guardar')
+      return
+    }
+
+    onSaved()
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '9px 12px',
+    border: '1px solid #e5e3dc',
+    borderRadius: 8,
+    fontSize: 13,
+    fontFamily: 'Montserrat, sans-serif',
+    color: '#1a1915',
+    background: '#fff',
+    outline: 'none',
+    boxSizing: 'border-box',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#4a4845',
+    marginBottom: 5,
+  }
+
+  const fieldStyle: React.CSSProperties = { marginBottom: 16 }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.35)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        style={{
+          background: '#fff', borderRadius: 14,
+          width: '100%', maxWidth: 500,
+          maxHeight: '90vh', overflowY: 'auto',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '18px 20px 14px',
+          borderBottom: '1px solid #e5e3dc',
+        }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#1a1915' }}>
+            {isEdit ? 'Editar lead' : 'Nuevo lead'}
+          </h2>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9a9895' }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={{ padding: '20px 20px 24px' }}>
+          {/* Cliente */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Cliente</label>
+            <select
+              value={form.clienteId}
+              onChange={e => set('clienteId', e.target.value)}
+              style={inputStyle}
+            >
+              <option value="">— Sin cliente —</option>
+              {clientes.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.empresa ? `${c.empresa} (${c.nombre})` : c.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Descripción */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Descripción</label>
+            <input
+              type="text"
+              value={form.descripcion}
+              onChange={e => set('descripcion', e.target.value)}
+              placeholder="Descripción del lead..."
+              style={inputStyle}
+            />
+          </div>
+
+          {/* Monto + Cuatrimestre row */}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Monto potencial (USD)</label>
+              <input
+                type="number"
+                value={form.montoPotencial}
+                onChange={e => set('montoPotencial', e.target.value)}
+                placeholder="0"
+                min={0}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Cuatrimestre</label>
+              <select
+                value={form.cuatrimestre}
+                onChange={e => set('cuatrimestre', e.target.value)}
+                style={inputStyle}
+              >
+                {QUARTER_OPTIONS.filter(o => o.value).map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Estado */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Etapa</label>
+            <select
+              value={form.estado}
+              onChange={e => set('estado', e.target.value as EstadoLead)}
+              style={inputStyle}
+            >
+              {ESTADO_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Motivo pérdida — solo si perdido */}
+          {form.estado === 'perdido' && (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Motivo de pérdida</label>
+              <input
+                type="text"
+                value={form.motivoPerdida}
+                onChange={e => set('motivoPerdida', e.target.value)}
+                placeholder="¿Por qué se perdió este lead?"
+                style={inputStyle}
+              />
+            </div>
+          )}
+
+          {/* Vendedor — solo gerente */}
+          {isGerente && (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Vendedor asignado</label>
+              <select
+                value={form.vendedorId}
+                onChange={e => set('vendedorId', e.target.value)}
+                style={inputStyle}
+              >
+                <option value="">— Sin asignar —</option>
+                {vendedores.map(v => (
+                  <option key={v.id} value={v.id}>{v.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Notas */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Notas</label>
+            <textarea
+              value={form.notas}
+              onChange={e => set('notas', e.target.value)}
+              placeholder="Observaciones adicionales..."
+              rows={3}
+              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              marginBottom: 14, padding: '8px 12px',
+              background: '#fef0f0', border: '1px solid #fca5a5',
+              borderRadius: 8, fontSize: 12, color: '#dc2626',
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '9px 18px', border: '1px solid #e5e3dc',
+                borderRadius: 8, background: '#fff', cursor: 'pointer',
+                fontSize: 13, fontWeight: 600, fontFamily: 'Montserrat, sans-serif',
+                color: '#4a4845',
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                padding: '9px 20px', border: 'none',
+                borderRadius: 8, background: saving ? '#c45a10' : '#eb691c',
+                cursor: saving ? 'wait' : 'pointer',
+                fontSize: 13, fontWeight: 600, fontFamily: 'Montserrat, sans-serif',
+                color: '#fff', opacity: saving ? 0.7 : 1,
+              }}
+            >
+              {saving ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear lead'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── Lead Card ────────────────────────────────────────────────────────────────
 
-function LeadCard({ lead, isGerente }: { lead: LeadRow; isGerente: boolean }) {
+function LeadCard({
+  lead,
+  isGerente,
+  onClick,
+}: {
+  lead: LeadRow
+  isGerente: boolean
+  onClick: () => void
+}) {
   const [hovered, setHovered] = useState(false)
 
   return (
     <div
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -147,86 +468,61 @@ function LeadCard({ lead, isGerente }: { lead: LeadRow; isGerente: boolean }) {
         cursor: 'pointer',
         transition: 'border-color 150ms ease, box-shadow 150ms ease',
         boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.07)' : '0 1px 3px rgba(0,0,0,0.04)',
+        position: 'relative',
       }}
     >
+      {/* Edit badge on hover */}
+      {hovered && (
+        <div style={{
+          position: 'absolute', top: 8, right: 8,
+          background: '#eb691c', borderRadius: 5,
+          width: 22, height: 22,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Pencil size={11} color="#fff" />
+        </div>
+      )}
+
       {/* Company name */}
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 700,
-          color: '#1a1915',
-          marginBottom: 4,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
+      <div style={{
+        fontSize: 13, fontWeight: 700, color: '#1a1915',
+        marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        paddingRight: hovered ? 28 : 0,
+      }}>
         {clientName(lead)}
       </div>
 
       {/* Description */}
       {lead.descripcion && (
-        <div
-          style={{
-            fontSize: 12,
-            color: '#4a4845',
-            lineHeight: 1.45,
-            marginBottom: 8,
-          }}
-        >
+        <div style={{ fontSize: 12, color: '#4a4845', lineHeight: 1.45, marginBottom: 8 }}>
           {truncate(lead.descripcion, 60)}
         </div>
       )}
 
       {/* Monto + quarter row */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 6,
-          flexWrap: 'wrap',
-        }}
-      >
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: '#eb691c',
-          }}
-        >
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 6, flexWrap: 'wrap',
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#eb691c' }}>
           {formatMonto(lead.monto_potencial)}
         </span>
-
         {lead.cuatrimestre && (
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              color: '#4a4845',
-              background: '#f4f3f0',
-              borderRadius: 4,
-              padding: '2px 6px',
-              letterSpacing: '0.3px',
-            }}
-          >
+          <span style={{
+            fontSize: 10, fontWeight: 600, color: '#4a4845',
+            background: '#f4f3f0', borderRadius: 4, padding: '2px 6px', letterSpacing: '0.3px',
+          }}>
             {lead.cuatrimestre}
           </span>
         )}
       </div>
 
-      {/* Gerente: show vendor name */}
+      {/* Gerente: vendor name */}
       {isGerente && (
-        <div
-          style={{
-            marginTop: 8,
-            fontSize: 11,
-            color: '#9a9895',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
+        <div style={{
+          marginTop: 8, fontSize: 11, color: '#9a9895',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}>
           <svg width="10" height="10" viewBox="0 0 20 20" fill="none">
             <path d="M10 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4Z" fill="currentColor" />
           </svg>
@@ -243,102 +539,58 @@ function KanbanColumn({
   col,
   leads,
   isGerente,
+  onCardClick,
 }: {
   col: ColumnDef
   leads: LeadRow[]
   isGerente: boolean
+  onCardClick: (lead: LeadRow) => void
 }) {
   return (
-    <div
-      style={{
-        minWidth: 260,
-        width: 260,
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-      }}
-    >
+    <div style={{ minWidth: 260, width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Column header */}
-      <div
-        style={{
-          background: col.headerBg,
-          borderRadius: '10px 10px 0 0',
-          padding: '10px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          border: '1px solid #e5e3dc',
-          borderBottom: 'none',
-        }}
-      >
+      <div style={{
+        background: col.headerBg, borderRadius: '10px 10px 0 0',
+        padding: '10px 14px', display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between', border: '1px solid #e5e3dc', borderBottom: 'none',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: col.dotColor,
-              display: 'inline-block',
-              flexShrink: 0,
-            }}
-          />
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: col.headerColor,
-              letterSpacing: '0.1px',
-            }}
-          >
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: col.dotColor, display: 'inline-block', flexShrink: 0,
+          }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: col.headerColor, letterSpacing: '0.1px' }}>
             {col.label}
           </span>
         </div>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: col.headerColor,
-            background: col.headerBg,
-            border: `1px solid ${col.dotColor}33`,
-            borderRadius: 10,
-            padding: '1px 8px',
-            minWidth: 22,
-            textAlign: 'center',
-          }}
-        >
+        <span style={{
+          fontSize: 11, fontWeight: 700, color: col.headerColor,
+          background: col.headerBg, border: `1px solid ${col.dotColor}33`,
+          borderRadius: 10, padding: '1px 8px', minWidth: 22, textAlign: 'center',
+        }}>
           {leads.length}
         </span>
       </div>
 
       {/* Cards list */}
-      <div
-        style={{
-          background: '#f9f8f5',
-          border: '1px solid #e5e3dc',
-          borderTop: 'none',
-          borderRadius: '0 0 10px 10px',
-          padding: 10,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          minHeight: 120,
-        }}
-      >
+      <div style={{
+        background: '#f9f8f5', border: '1px solid #e5e3dc',
+        borderTop: 'none', borderRadius: '0 0 10px 10px',
+        padding: 10, display: 'flex', flexDirection: 'column',
+        gap: 8, minHeight: 120,
+      }}>
         {leads.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              color: '#c5c2bb',
-              fontSize: 12,
-              padding: '20px 0',
-            }}
-          >
+          <div style={{ textAlign: 'center', color: '#c5c2bb', fontSize: 12, padding: '20px 0' }}>
             Sin leads
           </div>
         ) : (
           leads.map(lead => (
-            <LeadCard key={lead.id} lead={lead} isGerente={isGerente} />
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              isGerente={isGerente}
+              onClick={() => onCardClick(lead)}
+            />
           ))
         )}
       </div>
@@ -348,8 +600,28 @@ function KanbanColumn({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function LeadsClient({ leads, isGerente }: Props) {
+export default function LeadsClient({ leads, isGerente, userId, clientes, vendedores }: Props) {
+  const router = useRouter()
+  const [, startTransition] = useTransition()
   const [cuatrimestre, setCuatrimestre] = useState('')
+  const [modal, setModal] = useState<ModalState>({ open: false, lead: null })
+
+  function openCreate() {
+    setModal({ open: true, lead: null })
+  }
+
+  function openEdit(lead: LeadRow) {
+    setModal({ open: true, lead })
+  }
+
+  function closeModal() {
+    setModal({ open: false, lead: null })
+  }
+
+  function handleSaved() {
+    closeModal()
+    startTransition(() => { router.refresh() })
+  }
 
   const filtered = useMemo(() => {
     if (!cuatrimestre) return leads
@@ -362,18 +634,12 @@ export default function LeadsClient({ leads, isGerente }: Props) {
 
   const byColumn = useMemo(() => {
     const map: Record<EstadoLead, LeadRow[]> = {
-      nuevo: [],
-      en_conversacion: [],
-      propuesta_enviada: [],
-      negociacion: [],
-      ganado: [],
-      perdido: [],
+      nuevo: [], en_conversacion: [], propuesta_enviada: [],
+      negociacion: [], ganado: [], perdido: [],
     }
     for (const lead of filtered) {
       const key = lead.estado as EstadoLead
-      if (map[key]) {
-        map[key].push(lead)
-      }
+      if (map[key]) map[key].push(lead)
     }
     return map
   }, [filtered])
@@ -381,27 +647,26 @@ export default function LeadsClient({ leads, isGerente }: Props) {
   return (
     <div style={{ fontFamily: 'Montserrat, sans-serif', minHeight: '100%' }}>
 
+      {/* Modal */}
+      {modal.open && (
+        <LeadModal
+          modal={modal}
+          onClose={closeModal}
+          onSaved={handleSaved}
+          isGerente={isGerente}
+          userId={userId}
+          clientes={clientes}
+          vendedores={vendedores}
+        />
+      )}
+
       {/* Page header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 20,
-          flexWrap: 'wrap',
-          gap: 12,
-        }}
-      >
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 20, flexWrap: 'wrap', gap: 12,
+      }}>
         <div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: '#1a1915',
-              margin: 0,
-              letterSpacing: '-0.3px',
-            }}
-          >
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#1a1915', margin: 0, letterSpacing: '-0.3px' }}>
             Leads
           </h1>
           <p style={{ color: '#9a9895', fontSize: 13, marginTop: 3 }}>
@@ -415,47 +680,28 @@ export default function LeadsClient({ leads, isGerente }: Props) {
             value={cuatrimestre}
             onChange={e => setCuatrimestre(e.target.value)}
             style={{
-              padding: '8px 12px',
-              border: '1px solid #e5e3dc',
-              borderRadius: 8,
-              fontSize: 13,
-              fontFamily: 'Montserrat, sans-serif',
-              color: '#1a1915',
-              background: '#ffffff',
-              cursor: 'pointer',
-              outline: 'none',
-              appearance: 'none',
-              paddingRight: 28,
-              backgroundImage:
-                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9895' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 8px center',
+              padding: '8px 12px', border: '1px solid #e5e3dc', borderRadius: 8,
+              fontSize: 13, fontFamily: 'Montserrat, sans-serif', color: '#1a1915',
+              background: '#ffffff', cursor: 'pointer', outline: 'none',
+              appearance: 'none', paddingRight: 28,
+              backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9895' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+              backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
             }}
           >
             {QUARTER_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
 
           {/* New lead button */}
           <button
+            onClick={openCreate}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 16px',
-              background: '#eb691c',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: 'Montserrat, sans-serif',
-              cursor: 'pointer',
-              transition: 'background 150ms ease',
-              whiteSpace: 'nowrap',
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', background: '#eb691c', color: '#ffffff',
+              border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              fontFamily: 'Montserrat, sans-serif', cursor: 'pointer',
+              transition: 'background 150ms ease', whiteSpace: 'nowrap',
             }}
             onMouseEnter={e => (e.currentTarget.style.background = '#c45a10')}
             onMouseLeave={e => (e.currentTarget.style.background = '#eb691c')}
@@ -468,24 +714,11 @@ export default function LeadsClient({ leads, isGerente }: Props) {
 
       {/* Empty state: no leads at all */}
       {noLeads && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '80px 24px',
-            color: '#9a9895',
-            textAlign: 'center',
-          }}
-        >
-          <svg
-            width="48"
-            height="48"
-            viewBox="0 0 48 48"
-            fill="none"
-            style={{ marginBottom: 16, opacity: 0.4 }}
-          >
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', padding: '80px 24px', color: '#9a9895', textAlign: 'center',
+        }}>
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ marginBottom: 16, opacity: 0.4 }}>
             <rect x="8" y="8" width="32" height="32" rx="8" stroke="#9a9895" strokeWidth="2" fill="none" />
             <path d="M16 24h16M16 30h10" stroke="#9a9895" strokeWidth="2" strokeLinecap="round" />
             <circle cx="32" cy="18" r="6" fill="#eb691c" opacity="0.6" />
@@ -502,27 +735,13 @@ export default function LeadsClient({ leads, isGerente }: Props) {
 
       {/* Empty state: filter yields no results */}
       {noMatch && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '64px 24px',
-            color: '#9a9895',
-            textAlign: 'center',
-          }}
-        >
-          <svg
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            style={{ marginBottom: 12, opacity: 0.45 }}
-          >
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', padding: '64px 24px', color: '#9a9895', textAlign: 'center',
+        }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 12, opacity: 0.45 }}>
             <circle cx="11" cy="11" r="7" stroke="#9a9895" strokeWidth="1.5" />
             <path d="M16.5 16.5L21 21" stroke="#9a9895" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M8 11h6M11 8v6" stroke="#9a9895" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
           <p style={{ fontSize: 14, fontWeight: 700, color: '#4a4845', marginBottom: 4 }}>
             Sin resultados para {cuatrimestre}
@@ -534,43 +753,27 @@ export default function LeadsClient({ leads, isGerente }: Props) {
               onClick={() => setCuatrimestre('')}
             >
               ver todos
-            </span>
-            .
+            </span>.
           </p>
         </div>
       )}
 
       {/* Kanban board */}
       {!noLeads && !noMatch && (
-        <div
-          style={{
-            overflowX: 'auto',
-            overflowY: 'visible',
-            paddingBottom: 24,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              gap: 14,
-              minWidth: 'max-content',
-              alignItems: 'flex-start',
-            }}
-          >
+        <div style={{ overflowX: 'auto', overflowY: 'visible', paddingBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 14, minWidth: 'max-content', alignItems: 'flex-start' }}>
             {COLUMNS.map(col => (
               <KanbanColumn
                 key={col.estado}
                 col={col}
                 leads={byColumn[col.estado]}
                 isGerente={isGerente}
+                onCardClick={openEdit}
               />
             ))}
           </div>
         </div>
       )}
-
-      {/* Kanban with empty columns still shown when filter is active but some columns have data */}
-      {noLeads === false && noMatch === false && totalFiltered === 0 && null}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { TrendingUp, DollarSign, Target, Award, CheckCircle, XCircle } from 'lucide-react'
+import ApprovalButtons from '@/components/dashboard/ApprovalButtons'
 
 type EstadoOrden =
   | 'borrador'
@@ -32,13 +33,13 @@ const ETAPA_LABEL: Record<string, string> = {
   perdido: 'Perdido',
 }
 
-function getCurrentQuarter(): { label: string; start: string; end: string } {
+function getCurrentQuarter(): { label: string; displayLabel: string; start: string; end: string } {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth() + 1
-  if (month <= 4) return { label: 'Q1', start: `${year}-01-01`, end: `${year}-04-30` }
-  if (month <= 8) return { label: 'Q2', start: `${year}-05-01`, end: `${year}-08-31` }
-  return { label: 'Q3', start: `${year}-09-01`, end: `${year}-12-31` }
+  if (month <= 4) return { label: `Q1-${year}`, displayLabel: 'Q1', start: `${year}-01-01`, end: `${year}-04-30` }
+  if (month <= 8) return { label: `Q2-${year}`, displayLabel: 'Q2', start: `${year}-05-01`, end: `${year}-08-31` }
+  return { label: `Q3-${year}`, displayLabel: 'Q3', start: `${year}-09-01`, end: `${year}-12-31` }
 }
 
 function formatMoney(amount: number, currency: string = 'USD') {
@@ -54,6 +55,8 @@ function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
   if (!session?.user) redirect('/login')
@@ -63,7 +66,6 @@ export default async function DashboardPage() {
   const rol = session.user.rol
   const quarter = getCurrentQuarter()
 
-  // Parallel queries
   const [ordersRes, leadsRes, objetivoRes, facturadoRes] = await Promise.all([
     supabase
       .from('ordenes_venta')
@@ -74,15 +76,15 @@ export default async function DashboardPage() {
 
     supabase
       .from('leads')
-      .select('id, cliente_nombre, etapa, monto_potencial')
+      .select('id, descripcion, estado, monto_potencial, clientes(nombre, empresa)')
       .eq('vendedor_id', vendedorId)
-      .not('etapa', 'in', '(ganado,perdido)')
+      .not('estado', 'in', '(ganado,perdido)')
       .order('created_at', { ascending: false })
       .limit(5),
 
     supabase
       .from('objetivos')
-      .select('monto_objetivo')
+      .select('objetivo_monto')
       .eq('vendedor_id', vendedorId)
       .eq('cuatrimestre', quarter.label)
       .maybeSingle(),
@@ -98,9 +100,9 @@ export default async function DashboardPage() {
 
   const recentOrders = ordersRes.data ?? []
   const activeLeads = leadsRes.data ?? []
-  const objetivo = objetivoRes.data?.monto_objetivo ?? 0
+  const objetivo = Number(objetivoRes.data?.objetivo_monto ?? 0)
   const facturadoItems = facturadoRes.data ?? []
-  const facturado = facturadoItems.reduce((sum, o) => sum + (o.monto_total ?? 0), 0)
+  const facturado = facturadoItems.reduce((sum, o) => sum + Number(o.monto_total ?? 0), 0)
   const avance = objetivo > 0 ? Math.min((facturado / objetivo) * 100, 100) : 0
 
   // Manager-specific queries
@@ -138,7 +140,7 @@ export default async function DashboardPage() {
 
         supabase
           .from('objetivos')
-          .select('vendedor_id, monto_objetivo')
+          .select('vendedor_id, objetivo_monto')
           .in('vendedor_id', teamIds)
           .eq('cuatrimestre', quarter.label),
       ])
@@ -149,8 +151,8 @@ export default async function DashboardPage() {
       teamData = team.map(member => {
         const memberFact = teamOrders
           .filter(o => o.vendedor_id === member.id)
-          .reduce((s, o) => s + (o.monto_total ?? 0), 0)
-        const memberObj = teamObjetivos.find(o => o.vendedor_id === member.id)?.monto_objetivo ?? 0
+          .reduce((s, o) => s + Number(o.monto_total ?? 0), 0)
+        const memberObj = Number(teamObjetivos.find(o => o.vendedor_id === member.id)?.objetivo_monto ?? 0)
         return { id: member.id, nombre: member.nombre, facturado: memberFact, objetivo: memberObj }
       })
     }
@@ -171,7 +173,7 @@ export default async function DashboardPage() {
           fontSize: 12,
           fontWeight: 600,
         }}>
-          {quarter.label} · {new Date().getFullYear()}
+          {quarter.displayLabel} · {new Date().getFullYear()}
         </span>
       </div>
 
@@ -183,7 +185,7 @@ export default async function DashboardPage() {
             <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--orange-pale)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DollarSign size={18} color="var(--orange)" />
             </div>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Facturado {quarter.label}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Facturado {quarter.displayLabel}</span>
           </div>
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
             {formatMoney(facturado)}
@@ -195,7 +197,7 @@ export default async function DashboardPage() {
             <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Target size={18} color="var(--gray-600)" />
             </div>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Objetivo {quarter.label}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Objetivo {quarter.displayLabel}</span>
           </div>
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
             {objetivo > 0 ? formatMoney(objetivo) : <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>Sin objetivo</span>}
@@ -273,7 +275,7 @@ export default async function DashboardPage() {
                         {(order.clientes as any)?.nombre ?? '—'}
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {order.monto_total != null ? formatMoney(order.monto_total, order.moneda ?? 'USD') : '—'}
+                        {order.monto_total != null ? formatMoney(Number(order.monto_total), order.moneda ?? 'USD') : '—'}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: badge.bg, color: badge.color }}>
@@ -305,29 +307,33 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div>
-              {activeLeads.map((lead: any, i: number) => (
-                <div key={lead.id} style={{
-                  padding: '12px 20px',
-                  borderTop: i > 0 ? '1px solid var(--border)' : 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {lead.cliente_nombre}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      {ETAPA_LABEL[lead.etapa] ?? lead.etapa}
-                    </span>
-                    {lead.monto_potencial != null && (
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)' }}>
-                        {formatMoney(lead.monto_potencial)}
+              {activeLeads.map((lead: any, i: number) => {
+                const cli = Array.isArray(lead.clientes) ? lead.clientes[0] : lead.clientes
+                const nombre = (cli as any)?.empresa ?? (cli as any)?.nombre ?? lead.descripcion ?? '—'
+                return (
+                  <div key={lead.id} style={{
+                    padding: '12px 20px',
+                    borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {nombre}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {ETAPA_LABEL[lead.estado] ?? lead.estado}
                       </span>
-                    )}
+                      {lead.monto_potencial != null && (
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--green)' }}>
+                          {formatMoney(Number(lead.monto_potencial))}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -341,7 +347,7 @@ export default async function DashboardPage() {
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                Performance del equipo · {quarter.label}
+                Performance del equipo · {quarter.displayLabel}
               </span>
             </div>
             {teamData.length === 0 ? (
@@ -412,23 +418,13 @@ export default async function DashboardPage() {
                         {order.numero ?? `#${String(order.id).slice(0, 6)}`} · {(order.clientes as any)?.nombre ?? '—'}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {(order.perfiles as any)?.nombre ?? '—'} · {order.monto_total != null ? formatMoney(order.monto_total, order.moneda ?? 'USD') : '—'}
+                        {(order.perfiles as any)?.nombre ?? '—'} · {order.monto_total != null ? formatMoney(Number(order.monto_total), order.moneda ?? 'USD') : '—'}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        style={{ width: 30, height: 30, borderRadius: 6, border: '1px solid var(--green)', background: 'var(--green-pale)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        title="Aprobar"
-                      >
-                        <CheckCircle size={14} color="var(--green)" />
-                      </button>
-                      <button
-                        style={{ width: 30, height: 30, borderRadius: 6, border: '1px solid var(--red)', background: 'var(--red-pale)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        title="Rechazar"
-                      >
-                        <XCircle size={14} color="var(--red)" />
-                      </button>
-                    </div>
+                    <ApprovalButtons
+                      ordenId={order.id}
+                      numero={order.numero ?? String(order.id).slice(0, 6)}
+                    />
                   </div>
                 ))}
               </div>

@@ -1,0 +1,53 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { createServerClient } from '@/lib/supabase-server'
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  let body: {
+    clienteId?: string
+    agenciaId?: string
+    descripcion?: string
+    montoPotencial?: number | null
+    cuatrimestre?: string
+    estado?: string
+    notas?: string
+    motivoPerdida?: string
+  }
+  try { body = await req.json() } catch {
+    return NextResponse.json({ error: 'Payload inválido' }, { status: 400 })
+  }
+
+  const supabase = createServerClient()
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+
+  if (body.clienteId !== undefined) updates.cliente_id = body.clienteId || null
+  if (body.agenciaId !== undefined) updates.agencia_id = body.agenciaId || null
+  if (body.descripcion !== undefined) updates.descripcion = body.descripcion || null
+  if (body.montoPotencial !== undefined) updates.monto_potencial = body.montoPotencial
+  if (body.cuatrimestre !== undefined) updates.cuatrimestre = body.cuatrimestre || null
+  if (body.estado !== undefined) updates.estado = body.estado
+  if (body.notas !== undefined) updates.notas = body.notas || null
+  if (body.motivoPerdida !== undefined) updates.motivo_perdida = body.motivoPerdida || null
+
+  const { error } = await supabase
+    .from('leads')
+    .update(updates)
+    .eq('id', params.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  const supabase = createServerClient()
+  const { error } = await supabase.from('leads').delete().eq('id', params.id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
