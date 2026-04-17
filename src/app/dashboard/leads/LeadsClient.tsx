@@ -57,11 +57,12 @@ const COLUMNS: ColumnDef[] = [
   { estado: 'perdido', label: 'Perdido', headerBg: '#fef0f0', headerColor: '#991b1b', dotColor: '#d63b3b' },
 ]
 
+const _y = new Date().getFullYear()
 const QUARTER_OPTIONS = [
   { value: '', label: 'Todos los cuatrimestres' },
-  { value: 'Q1-2026', label: 'Q1-2026' },
-  { value: 'Q2-2026', label: 'Q2-2026' },
-  { value: 'Q3-2026', label: 'Q3-2026' },
+  { value: `Q1-${_y}`, label: `Q1-${_y}` },
+  { value: `Q2-${_y}`, label: `Q2-${_y}` },
+  { value: `Q3-${_y}`, label: `Q3-${_y}` },
 ]
 
 const ESTADO_OPTIONS: { value: EstadoLead; label: string }[] = [
@@ -130,7 +131,7 @@ function emptyForm(userId: string): LeadFormValues {
     clienteId: '',
     descripcion: '',
     montoPotencial: '',
-    cuatrimestre: 'Q1-2026',
+    cuatrimestre: `Q1-${new Date().getFullYear()}`,
     estado: 'nuevo',
     notas: '',
     motivoPerdida: '',
@@ -143,7 +144,7 @@ function leadToForm(lead: LeadRow, userId: string): LeadFormValues {
     clienteId: lead.cliente_id ?? '',
     descripcion: lead.descripcion ?? '',
     montoPotencial: lead.monto_potencial != null ? String(lead.monto_potencial) : '',
-    cuatrimestre: lead.cuatrimestre ?? 'Q1-2026',
+    cuatrimestre: lead.cuatrimestre ?? `Q1-${new Date().getFullYear()}`,
     estado: (lead.estado as EstadoLead) ?? 'nuevo',
     notas: lead.notas ?? '',
     motivoPerdida: '',

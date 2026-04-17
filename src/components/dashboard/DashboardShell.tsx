@@ -8,7 +8,7 @@ import {
   Users, Target, Star, Wrench, Truck, Monitor,
   Palette, Receipt, AlertCircle, Percent, Building2,
   CreditCard, Settings, MessageCircle, X, Send,
-  FlaskConical,
+  FlaskConical, Package,
 } from 'lucide-react'
 
 type Rol = 'vendedor' | 'asistente_ventas' | 'gerente_comercial' | 'operaciones' | 'arte' | 'administracion'
@@ -38,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/admin/comisiones', label: 'Comisiones', icon: <Percent size={16} />, roles: ['administracion'] },
   { href: '/dashboard/admin/canon', label: 'Canon', icon: <Building2 size={16} />, roles: ['administracion'] },
   { href: '/dashboard/admin/gastos', label: 'Gastos', icon: <CreditCard size={16} />, roles: ['administracion'] },
+  { href: '/dashboard/admin/soportes', label: 'Soportes', icon: <Package size={16} />, roles: ['asistente_ventas', 'administracion'] },
   { href: '/dashboard/config', label: 'Configuración', icon: <Settings size={16} />, roles: ['administracion'] },
 ]
 
@@ -60,6 +61,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/admin/comisiones': 'Comisiones',
   '/dashboard/admin/canon': 'Canon',
   '/dashboard/admin/gastos': 'Gastos',
+  '/dashboard/admin/soportes': 'Soportes',
   '/dashboard/config': 'Configuración',
 }
 

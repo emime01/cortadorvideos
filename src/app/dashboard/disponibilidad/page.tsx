@@ -76,6 +76,8 @@ export default async function DisponibilidadPage() {
       initialSoportes={initialSoportes}
       initialFecha={today}
       clientes={(clientes ?? []).map((c: any) => ({ id: c.id, nombre: c.nombre, empresa: c.empresa ?? null }))}
+      userRol={session.user.rol}
+      userId={session.user.id}
     />
   )
 }
