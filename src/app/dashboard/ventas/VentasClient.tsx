@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Plus, Download, Search } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
@@ -86,9 +87,11 @@ function joinedNombre(val: JoinedRow): string {
 interface Props {
   ordenes: OrdenRow[]
   userRol: string
+  userId?: string
 }
 
 export default function VentasClient({ ordenes, userRol }: Props) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState('')
   const [quarter, setQuarter] = useState('')
@@ -247,6 +250,7 @@ export default function VentasClient({ ordenes, userRol }: Props) {
                 return (
                   <tr
                     key={order.id}
+                    onClick={() => router.push(`/dashboard/ventas/${order.id}`)}
                     style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--gray-100)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

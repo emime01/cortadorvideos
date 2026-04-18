@@ -53,6 +53,8 @@ interface Props {
   vendedores: Vendedor[]
   formasPago: string[]
   currentUserId: string
+  leadId?: string
+  initialClienteId?: string
 }
 
 const inputStyle: React.CSSProperties = {
@@ -117,11 +119,11 @@ function emptyItem(): ItemRow {
 
 const IVA_RATE = 0.22
 
-export default function NuevaOrdenForm({ soportes, clientes, agencias, vendedores, formasPago, currentUserId }: Props) {
+export default function NuevaOrdenForm({ soportes, clientes, agencias, vendedores, formasPago, currentUserId, leadId, initialClienteId }: Props) {
   const router = useRouter()
 
   // Header state
-  const [clienteId, setClienteId] = useState('')
+  const [clienteId, setClienteId] = useState(initialClienteId ?? '')
   const [contacto, setContacto] = useState('')
   const [agenciaId, setAgenciaId] = useState('')
   const [facturarA, setFacturarA] = useState<'agencia' | 'cliente_final'>('cliente_final')
@@ -143,6 +145,12 @@ export default function NuevaOrdenForm({ soportes, clientes, agencias, vendedore
   const [comentarioArrend, setComentarioArrend] = useState('')
   const [formaPagoProd, setFormaPagoProd] = useState('')
   const [comentarioProd, setComentarioProd] = useState('')
+
+  // Detalles y adjunto
+  const [detallesTexto, setDetallesTexto] = useState('')
+  const [adjuntoFile, setAdjuntoFile] = useState<File | null>(null)
+  const [adjuntoUrl, setAdjuntoUrl] = useState('')
+  const [uploadingPdf, setUploadingPdf] = useState(false)
 
   // UI state
   const [saving, setSaving] = useState(false)
@@ -207,6 +215,20 @@ export default function NuevaOrdenForm({ soportes, clientes, agencias, vendedore
 
     setSaving(true)
     try {
+      let finalAdjuntoUrl = adjuntoUrl
+      if (adjuntoFile && !adjuntoUrl) {
+        setUploadingPdf(true)
+        const fd = new FormData()
+        fd.append('file', adjuntoFile)
+        const upRes = await fetch('/api/upload', { method: 'POST', body: fd })
+        setUploadingPdf(false)
+        if (upRes.ok) {
+          const upData = await upRes.json()
+          finalAdjuntoUrl = upData.url
+          setAdjuntoUrl(upData.url)
+        }
+      }
+
       const res = await fetch('/api/ordenes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -228,6 +250,9 @@ export default function NuevaOrdenForm({ soportes, clientes, agencias, vendedore
           comentarioArrend: comentarioArrend || undefined,
           formaPagoProd: formaPagoProd || undefined,
           comentarioProd: comentarioProd || undefined,
+          leadId: leadId || undefined,
+          detallesTexto: detallesTexto || undefined,
+          adjuntoUrl: finalAdjuntoUrl || undefined,
           estado,
           items: items
             .filter(i => i.soporteId)
@@ -515,6 +540,65 @@ export default function NuevaOrdenForm({ soportes, clientes, agencias, vendedore
           <div>
             <label style={labelStyle}>Comentario producción</label>
             <input type="text" value={comentarioProd} onChange={e => setComentarioProd(e.target.value)} placeholder="Condiciones adicionales" style={inputStyle} />
+          </div>
+        </div>
+      </div>
+
+      {/* Section 4: Detalles y adjunto */}
+      <div style={sectionStyle}>
+        <div style={sectionTitleStyle}>Detalles de la compra</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={labelStyle}>Descripción / notas de la orden</label>
+            <textarea
+              value={detallesTexto}
+              onChange={e => setDetallesTexto(e.target.value)}
+              placeholder="Ingresá los detalles de la compra, condiciones especiales, observaciones, etc."
+              rows={5}
+              style={{
+                width: '100%', padding: '10px 12px',
+                border: '1px solid var(--border)', borderRadius: 8,
+                fontSize: 13, fontFamily: 'Montserrat, sans-serif',
+                color: 'var(--text-primary)', outline: 'none',
+                boxSizing: 'border-box', resize: 'vertical',
+                lineHeight: 1.5,
+              }}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Adjuntar PDF (orden de compra, brief, etc.)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '8px 16px', borderRadius: 8,
+                border: '1px dashed var(--border)',
+                cursor: 'pointer', fontSize: 13,
+                color: 'var(--text-secondary)',
+                background: 'var(--bg-card)',
+              }}>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const f = e.target.files?.[0] ?? null
+                    setAdjuntoFile(f)
+                    setAdjuntoUrl('')
+                  }}
+                />
+                📎 {adjuntoFile ? adjuntoFile.name : 'Seleccionar archivo'}
+              </label>
+              {adjuntoFile && !adjuntoUrl && (
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {uploadingPdf ? 'Subiendo...' : 'Se subirá al guardar'}
+                </span>
+              )}
+              {adjuntoUrl && (
+                <a href={adjuntoUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--orange)', textDecoration: 'none' }}>
+                  Ver archivo ↗
+                </a>
+              )}
+            </div>
           </div>
         </div>
       </div>

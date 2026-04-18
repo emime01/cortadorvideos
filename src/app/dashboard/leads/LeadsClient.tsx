@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, Pencil } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, X, Pencil, ShoppingCart } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,7 @@ type JoinedRow<T> = T | T[] | null
 export interface LeadRow {
   id: string
   cliente_id: string | null
+  vendedor_id: string | null
   descripcion: string | null
   monto_potencial: number | null
   cuatrimestre: string | null
@@ -530,6 +532,26 @@ function LeadCard({
           {vendorName(lead)}
         </div>
       )}
+
+      {/* Crear venta button */}
+      {(lead.estado === 'ganado' || lead.estado === 'negociacion' || lead.estado === 'propuesta_enviada') && (
+        <Link
+          href={`/dashboard/ventas/nueva?lead=${lead.id}`}
+          onClick={e => e.stopPropagation()}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            marginTop: 10, padding: '6px 10px',
+            background: '#eb691c', color: '#fff',
+            borderRadius: 6, fontSize: 11, fontWeight: 600,
+            textDecoration: 'none', transition: 'background 150ms',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#c45a10')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#eb691c')}
+        >
+          <ShoppingCart size={11} />
+          Crear venta
+        </Link>
+      )}
     </div>
   )
 }
@@ -605,6 +627,7 @@ export default function LeadsClient({ leads, isGerente, userId, clientes, vended
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [cuatrimestre, setCuatrimestre] = useState('')
+  const [vendedorFilter, setVendedorFilter] = useState('')
   const [modal, setModal] = useState<ModalState>({ open: false, lead: null })
 
   function openCreate() {
@@ -625,9 +648,11 @@ export default function LeadsClient({ leads, isGerente, userId, clientes, vended
   }
 
   const filtered = useMemo(() => {
-    if (!cuatrimestre) return leads
-    return leads.filter(l => l.cuatrimestre === cuatrimestre)
-  }, [leads, cuatrimestre])
+    let result = leads
+    if (cuatrimestre) result = result.filter(l => l.cuatrimestre === cuatrimestre)
+    if (vendedorFilter) result = result.filter(l => l.vendedor_id === vendedorFilter)
+    return result
+  }, [leads, cuatrimestre, vendedorFilter])
 
   const totalFiltered = filtered.length
   const noLeads = leads.length === 0
@@ -693,6 +718,27 @@ export default function LeadsClient({ leads, isGerente, userId, clientes, vended
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
+
+          {/* Vendedor filter (gerente only) */}
+          {isGerente && (
+            <select
+              value={vendedorFilter}
+              onChange={e => setVendedorFilter(e.target.value)}
+              style={{
+                padding: '8px 12px', border: '1px solid #e5e3dc', borderRadius: 8,
+                fontSize: 13, fontFamily: 'Montserrat, sans-serif', color: '#1a1915',
+                background: '#ffffff', cursor: 'pointer', outline: 'none',
+                appearance: 'none', paddingRight: 28,
+                backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9895' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+                backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
+              }}
+            >
+              <option value="">Todos los vendedores</option>
+              {vendedores.map(v => (
+                <option key={v.id} value={v.id}>{v.nombre}</option>
+              ))}
+            </select>
+          )}
 
           {/* New lead button */}
           <button

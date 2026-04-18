@@ -4,15 +4,15 @@ import { createServerClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import VentasClient from './VentasClient'
 
+export const dynamic = 'force-dynamic'
+
 export default async function VentasPage() {
   const session = await getServerSession(authOptions)
   if (!session?.user) redirect('/login')
 
   const supabase = createServerClient()
-  const rol = session.user.rol
-  const vendedorId = session.user.id
 
-  let query = supabase
+  const { data: ordenes } = await supabase
     .from('ordenes_venta')
     .select(`
       id, numero, monto_total, moneda, estado, created_at,
@@ -23,12 +23,5 @@ export default async function VentasPage() {
     .order('created_at', { ascending: false })
     .limit(200)
 
-  // Vendedores only see their own orders
-  if (rol === 'vendedor' || rol === 'asistente_ventas') {
-    query = query.eq('vendedor_id', vendedorId) as typeof query
-  }
-
-  const { data: ordenes } = await query
-
-  return <VentasClient ordenes={ordenes ?? []} userRol={rol} />
+  return <VentasClient ordenes={ordenes ?? []} userRol={session.user.rol} userId={session.user.id} />
 }

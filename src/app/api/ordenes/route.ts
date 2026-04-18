@@ -37,6 +37,9 @@ interface OrdenPayload {
   formaPagoProd?: string
   comentarioProd?: string
   asignadoAId?: string
+  leadId?: string
+  detallesTexto?: string
+  adjuntoUrl?: string
   estado: 'borrador' | 'pendiente_aprobacion'
   items: OrdenItem[]
 }
@@ -61,13 +64,11 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
   const vendedorId = body.asignadoAId || session.user.id
 
-  // Calculate total from items
   const montoTotal = (body.items ?? []).reduce((sum, item) => {
     const lineTotal = item.precioUnitario * item.cantidad * item.semanas * (1 - (item.descuentoPct ?? 0) / 100)
     return sum + lineTotal
   }, 0)
 
-  // Insert order header
   const { data: orden, error: ordenError } = await supabase
     .from('ordenes_venta')
     .insert({
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
       agencia_id: body.agenciaId || null,
       vendedor_id: vendedorId,
       contacto: body.contacto || null,
-      facturar_a: body.facturarA || null,
+      facturar_a: body.facturarA || 'cliente_final',
       marca: body.marca || null,
       referencia: body.referencia || null,
       moneda: body.moneda,
@@ -93,6 +94,9 @@ export async function POST(req: NextRequest) {
       comentario_arrend: body.comentarioArrend || null,
       forma_pago_prod: body.formaPagoProd || null,
       comentario_prod: body.comentarioProd || null,
+      lead_id: body.leadId || null,
+      detalles_texto: body.detallesTexto || null,
+      adjunto_url: body.adjuntoUrl || null,
     })
     .select('id')
     .single()
@@ -102,7 +106,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: ordenError?.message ?? 'Error al crear la orden' }, { status: 500 })
   }
 
-  // Insert items
   if (body.items && body.items.length > 0) {
     const { error: itemsError } = await supabase
       .from('orden_items')
@@ -124,13 +127,11 @@ export async function POST(req: NextRequest) {
 
     if (itemsError) {
       console.error('Error insertando items:', itemsError)
-      // Rollback order if items failed
       await supabase.from('ordenes_venta').delete().eq('id', orden.id)
       return NextResponse.json({ error: 'Error al guardar los ítems de la orden' }, { status: 500 })
     }
   }
 
-  // Insert historial entry
   await supabase.from('orden_historial').insert({
     orden_id: orden.id,
     perfil_id: session.user.id,
