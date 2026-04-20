@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, X, Pencil, ShoppingCart, Gift, Check, XCircle } from 'lucide-react'
+import { Plus, X, Pencil, ShoppingCart, Gift, Check, XCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
+const DIAS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
 interface BirthdayContacto {
   id: string
@@ -270,6 +271,8 @@ export interface LeadRow {
   cuatrimestre: string | null
   estado: string
   notas: string | null
+  proxima_gestion: string | null
+  nota_gestion: string | null
   created_at: string
   clientes: JoinedRow<{ nombre: string | null; empresa: string | null }>
   agencias: JoinedRow<{ nombre: string }>
@@ -292,6 +295,15 @@ interface ColumnDef {
   dotColor: string
 }
 
+interface ClienteObjetivo {
+  cliente_id: string
+  ponderacion_pct: number | null
+  objetivo_c1: number | null
+  objetivo_c2: number | null
+  objetivo_c3: number | null
+  clientes: JoinedRow<{ nombre: string | null; empresa: string | null }>
+}
+
 interface Props {
   leads: LeadRow[]
   isGerente: boolean
@@ -299,6 +311,7 @@ interface Props {
   userRol: string
   clientes: { id: string; nombre: string; empresa: string | null }[]
   vendedores: { id: string; nombre: string }[]
+  clienteObjetivos: ClienteObjetivo[]
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -379,6 +392,8 @@ interface LeadFormValues {
   notas: string
   motivoPerdida: string
   vendedorId: string
+  proximaGestion: string
+  notaGestion: string
 }
 
 function emptyForm(userId: string): LeadFormValues {
@@ -391,6 +406,8 @@ function emptyForm(userId: string): LeadFormValues {
     notas: '',
     motivoPerdida: '',
     vendedorId: userId,
+    proximaGestion: '',
+    notaGestion: '',
   }
 }
 
@@ -404,6 +421,8 @@ function leadToForm(lead: LeadRow, userId: string): LeadFormValues {
     notas: lead.notas ?? '',
     motivoPerdida: '',
     vendedorId: userId,
+    proximaGestion: lead.proxima_gestion ?? '',
+    notaGestion: lead.nota_gestion ?? '',
   }
 }
 
@@ -448,6 +467,8 @@ function LeadModal({
       estado: form.estado,
       notas: form.notas || undefined,
       motivoPerdida: form.estado === 'perdido' ? form.motivoPerdida || undefined : undefined,
+      proximaGestion: form.proximaGestion || null,
+      notaGestion: form.notaGestion || null,
     }
 
     if (isGerente && form.vendedorId) {
@@ -653,6 +674,31 @@ function LeadModal({
             />
           </div>
 
+          {/* Próxima gestión */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Próxima gestión (fecha)</label>
+            <input
+              type="date"
+              value={form.proximaGestion}
+              onChange={e => set('proximaGestion', e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+
+          {/* Nota de gestión — solo si hay fecha */}
+          {form.proximaGestion && (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Nota de gestión</label>
+              <textarea
+                value={form.notaGestion}
+                onChange={e => set('notaGestion', e.target.value)}
+                placeholder="¿Qué se planea hacer en esta gestión?"
+                rows={2}
+                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
+              />
+            </div>
+          )}
+
           {error && (
             <div style={{
               marginBottom: 14, padding: '8px 12px',
@@ -773,6 +819,14 @@ function LeadCard({
         )}
       </div>
 
+      {/* Próxima gestión chip */}
+      {lead.proxima_gestion && (
+        <div style={{ marginTop: 6, fontSize: 11, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          {new Date(lead.proxima_gestion + 'T12:00:00').toLocaleDateString('es-UY', { day: 'numeric', month: 'short' })}
+        </div>
+      )}
+
       {/* Gerente: vendor name */}
       {isGerente && (
         <div style={{
@@ -874,11 +928,219 @@ function KanbanColumn({
   )
 }
 
+// ─── Mis Clientes Tab ────────────────────────────────────────────────────────
+
+function MisClientesTab({ clienteObjetivos, leads }: { clienteObjetivos: ClienteObjetivo[]; leads: LeadRow[] }) {
+  const _y = new Date().getFullYear()
+  const [cuatrimestre, setCuatrimestre] = useState('')
+
+  const activeLeadsByClient: Record<string, number> = {}
+  for (const l of leads) {
+    if (l.cliente_id && !['ganado', 'perdido'].includes(l.estado)) {
+      activeLeadsByClient[l.cliente_id] = (activeLeadsByClient[l.cliente_id] ?? 0) + 1
+    }
+  }
+
+  const fmtObj = (n: number | null) => n == null || n === 0 ? '—' : '$' + n.toLocaleString('es-UY', { maximumFractionDigits: 0 })
+  const qKey = cuatrimestre ? cuatrimestre.split('-')[0] : null
+
+  const thS: React.CSSProperties = { padding: '10px 16px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', whiteSpace: 'nowrap' }
+  const tdS: React.CSSProperties = { padding: '12px 16px', borderBottom: '1px solid var(--border)' }
+
+  if (clienteObjetivos.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--text-muted)' }}>
+        <p style={{ fontSize: 14, fontWeight: 600 }}>No tenés clientes con objetivos asignados.</p>
+        <p style={{ fontSize: 13 }}>Importá el archivo de cuentas y objetivos desde <Link href="/dashboard/cuentas" style={{ color: '#eb691c' }}>Cuentas → Importar</Link>.</p>
+      </div>
+    )
+  }
+
+  const selectS: React.CSSProperties = {
+    padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8,
+    fontSize: 13, fontFamily: 'Montserrat, sans-serif', color: 'var(--text-primary)',
+    background: 'var(--bg-card)', cursor: 'pointer', outline: 'none',
+    appearance: 'none', paddingRight: 28,
+    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9895' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Mis Clientes</h2>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>{clienteObjetivos.length} cliente{clienteObjetivos.length !== 1 ? 's' : ''} asignado{clienteObjetivos.length !== 1 ? 's' : ''}</p>
+        </div>
+        <select value={cuatrimestre} onChange={e => setCuatrimestre(e.target.value)} style={selectS}>
+          <option value="">Todos los cuatrimestres</option>
+          {[`Q1-${_y}`, `Q2-${_y}`, `Q3-${_y}`].map(q => <option key={q} value={q}>{q}</option>)}
+        </select>
+      </div>
+
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-app)', borderBottom: '1px solid var(--border)' }}>
+              <th style={thS}>Cliente</th>
+              <th style={{ ...thS, textAlign: 'right' }}>Pond.</th>
+              <th style={{ ...thS, textAlign: 'right', color: qKey === 'Q1' ? '#eb691c' : undefined }}>C1</th>
+              <th style={{ ...thS, textAlign: 'right', color: qKey === 'Q2' ? '#eb691c' : undefined }}>C2</th>
+              <th style={{ ...thS, textAlign: 'right', color: qKey === 'Q3' ? '#eb691c' : undefined }}>C3</th>
+              <th style={{ ...thS, textAlign: 'right' }}>Leads activos</th>
+              <th style={{ ...thS, textAlign: 'right' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {clienteObjetivos.map(co => {
+              const cl = getJoined(co.clientes as JoinedRow<{ nombre: string | null; empresa: string | null }>)
+              const nombre = cl?.empresa || cl?.nombre || '—'
+              const active = activeLeadsByClient[co.cliente_id] ?? 0
+              return (
+                <tr key={co.cliente_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={tdS}><span style={{ fontWeight: 600 }}>{nombre}</span></td>
+                  <td style={{ ...tdS, textAlign: 'right', color: 'var(--text-muted)' }}>{co.ponderacion_pct != null ? `${co.ponderacion_pct}%` : '—'}</td>
+                  <td style={{ ...tdS, textAlign: 'right', fontWeight: qKey === 'Q1' ? 700 : undefined, color: qKey === 'Q1' ? '#eb691c' : undefined }}>{fmtObj(co.objetivo_c1)}</td>
+                  <td style={{ ...tdS, textAlign: 'right', fontWeight: qKey === 'Q2' ? 700 : undefined, color: qKey === 'Q2' ? '#eb691c' : undefined }}>{fmtObj(co.objetivo_c2)}</td>
+                  <td style={{ ...tdS, textAlign: 'right', fontWeight: qKey === 'Q3' ? 700 : undefined, color: qKey === 'Q3' ? '#eb691c' : undefined }}>{fmtObj(co.objetivo_c3)}</td>
+                  <td style={{ ...tdS, textAlign: 'right' }}>
+                    {active > 0
+                      ? <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: 10, fontWeight: 700, fontSize: 12 }}>{active}</span>
+                      : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                  </td>
+                  <td style={{ ...tdS, textAlign: 'right' }}>
+                    <Link href={`/dashboard/cuentas/${co.cliente_id}`} style={{ fontSize: 12, color: '#eb691c', fontWeight: 600, textDecoration: 'none' }}>Ver historial →</Link>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── Calendario Tab ───────────────────────────────────────────────────────────
+
+function CalendarioTab({ leads }: { leads: LeadRow[] }) {
+  const today = new Date()
+  const [viewMonth, setViewMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+
+  const byDate: Record<string, LeadRow[]> = {}
+  for (const l of leads) {
+    if (l.proxima_gestion) {
+      if (!byDate[l.proxima_gestion]) byDate[l.proxima_gestion] = []
+      byDate[l.proxima_gestion].push(l)
+    }
+  }
+
+  const year = viewMonth.getFullYear()
+  const month = viewMonth.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  let startOffset = firstDay.getDay() - 1
+  if (startOffset < 0) startOffset = 6
+
+  const cells: (number | null)[] = []
+  for (let i = 0; i < startOffset; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const totalScheduled = Object.values(byDate).reduce((s, a) => s + a.length, 0)
+  const selectedLeads = selectedDate ? (byDate[selectedDate] ?? []) : []
+
+  const btnS: React.CSSProperties = { background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', color: 'var(--text-muted)', borderRadius: 6, display: 'flex', alignItems: 'center' }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Calendario de gestiones</h2>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+          {totalScheduled === 0 ? 'Sin gestiones agendadas. Editá un lead para agendar una fecha.' : `${totalScheduled} gestión${totalScheduled !== 1 ? 'es' : ''} agendada${totalScheduled !== 1 ? 's' : ''}`}
+        </p>
+      </div>
+
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+          <button style={btnS} onClick={() => setViewMonth(new Date(year, month - 1, 1))}><ChevronLeft size={16} /></button>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+            {MESES_ES[month]} {year}
+          </span>
+          <button style={btnS} onClick={() => setViewMonth(new Date(year, month + 1, 1))}><ChevronRight size={16} /></button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '10px 12px 0' }}>
+          {DIAS_ES.map(d => (
+            <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', padding: '4px 0', textTransform: 'uppercase' }}>{d}</div>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '4px 12px 12px', gap: 3 }}>
+          {cells.map((day, i) => {
+            if (!day) return <div key={`e-${i}`} />
+            const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+            const hasLeads = !!byDate[ds]
+            const count = byDate[ds]?.length ?? 0
+            const isToday = ds === todayStr
+            const isSel = ds === selectedDate
+            return (
+              <div
+                key={ds}
+                onClick={() => hasLeads && setSelectedDate(isSel ? null : ds)}
+                style={{
+                  padding: '6px 4px', textAlign: 'center', borderRadius: 6, minHeight: 50,
+                  cursor: hasLeads ? 'pointer' : 'default',
+                  background: isSel ? '#eb691c' : isToday ? 'var(--orange-pale)' : 'transparent',
+                  border: isToday && !isSel ? '1px solid #eb691c' : '1px solid transparent',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: isToday || isSel ? 700 : 400, color: isSel ? '#fff' : isToday ? '#eb691c' : 'var(--text-primary)' }}>{day}</span>
+                {hasLeads && (
+                  <span style={{ background: isSel ? 'rgba(255,255,255,0.3)' : '#eb691c', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 8, minWidth: 18 }}>{count}</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {selectedDate && selectedLeads.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+            Gestiones para el {selectedDate.split('-')[2]} de {MESES_ES[Number(selectedDate.split('-')[1]) - 1]}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {selectedLeads.map(lead => (
+              <div key={lead.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{clientName(lead)}</div>
+                  {lead.descripcion && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{lead.descripcion}</div>}
+                  {lead.nota_gestion && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>"{lead.nota_gestion}"</div>}
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#eb691c' }}>{formatMonto(lead.monto_potencial)}</div>
+                  {lead.cuatrimestre && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{lead.cuatrimestre}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function LeadsClient({ leads, isGerente, userId, userRol, clientes, vendedores }: Props) {
+export default function LeadsClient({ leads, isGerente, userId, userRol, clientes, vendedores, clienteObjetivos }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const [activeTab, setActiveTab] = useState<'leads' | 'mis_clientes' | 'calendario'>('leads')
   const [cuatrimestre, setCuatrimestre] = useState('')
   const [vendedorFilter, setVendedorFilter] = useState('')
   const [modal, setModal] = useState<ModalState>({ open: false, lead: null })
@@ -923,10 +1185,33 @@ export default function LeadsClient({ leads, isGerente, userId, userRol, cliente
     return map
   }, [filtered])
 
+  const tabs = isGerente
+    ? [{ key: 'leads', label: 'Leads' }, { key: 'calendario', label: 'Calendario' }]
+    : [{ key: 'leads', label: 'Leads' }, { key: 'mis_clientes', label: 'Mis Clientes' }, { key: 'calendario', label: 'Calendario' }]
+
   return (
     <div style={{ fontFamily: 'Montserrat, sans-serif', minHeight: '100%' }}>
 
       <BirthdayPanel userRol={userRol} />
+
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderBottom: '1px solid var(--border)' }}>
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as typeof activeTab)}
+            style={{
+              padding: '8px 18px', border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: activeTab === tab.key ? 700 : 500,
+              color: activeTab === tab.key ? '#eb691c' : 'var(--text-muted)',
+              borderBottom: activeTab === tab.key ? '2px solid #eb691c' : '2px solid transparent',
+              marginBottom: -1, fontFamily: 'Montserrat, sans-serif',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {/* Modal */}
       {modal.open && (
@@ -940,6 +1225,19 @@ export default function LeadsClient({ leads, isGerente, userId, userRol, cliente
           vendedores={vendedores}
         />
       )}
+
+      {/* Mis Clientes tab */}
+      {activeTab === 'mis_clientes' && !isGerente && (
+        <MisClientesTab clienteObjetivos={clienteObjetivos} leads={leads} />
+      )}
+
+      {/* Calendario tab */}
+      {activeTab === 'calendario' && (
+        <CalendarioTab leads={leads} />
+      )}
+
+      {/* Leads tab */}
+      {activeTab === 'leads' && <>
 
       {/* Page header */}
       <div style={{
@@ -1076,6 +1374,8 @@ export default function LeadsClient({ leads, isGerente, userId, userRol, cliente
           </div>
         </div>
       )}
+
+      </>}
     </div>
   )
 }

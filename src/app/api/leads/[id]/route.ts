@@ -16,6 +16,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     estado?: string
     notas?: string
     motivoPerdida?: string
+    proximaGestion?: string | null
+    notaGestion?: string | null
   }
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'Payload inválido' }, { status: 400 })
@@ -32,6 +34,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.estado !== undefined) updates.estado = body.estado
   if (body.notas !== undefined) updates.notas = body.notas || null
   if (body.motivoPerdida !== undefined) updates.motivo_perdida = body.motivoPerdida || null
+  if (body.proximaGestion !== undefined) updates.proxima_gestion = body.proximaGestion || null
+  if (body.notaGestion !== undefined) updates.nota_gestion = body.notaGestion || null
 
   const { error } = await supabase
     .from('leads')

@@ -32,6 +32,16 @@ export default async function GerentePage() {
 
   const ROL_LABELS: Record<string, string> = { vendedor: 'Vendedor', asistente_ventas: 'Asistente de Ventas' }
 
+  const STAGES = ['nuevo', 'en_conversacion', 'propuesta_enviada', 'negociacion', 'ganado', 'perdido'] as const
+  const STAGE_LABELS: Record<string, string> = {
+    nuevo: 'Nuevo', en_conversacion: 'En conv.', propuesta_enviada: 'Propuesta',
+    negociacion: 'Negoc.', ganado: 'Ganado', perdido: 'Perdido',
+  }
+  const STAGE_COLORS: Record<string, string> = {
+    nuevo: '#9a9895', en_conversacion: '#3b82f6', propuesta_enviada: '#f59e0b',
+    negociacion: '#eb691c', ganado: '#15803d', perdido: '#dc2626',
+  }
+
   const stats = vendedores?.map(v => {
     const myOrds = ordenes?.filter(o => o.vendedor_id === v.id) ?? []
     const facturado = myOrds.reduce((s, o) => s + Number(o.monto_total ?? 0), 0)
@@ -41,7 +51,9 @@ export default async function GerentePage() {
     const obj = objetivos?.find(o => o.vendedor_id === v.id)
     const objetivo = Number(obj?.objetivo_monto ?? 0)
     const avance = objetivo > 0 ? Math.min(Math.round((facturado / objetivo) * 100), 100) : 0
-    return { ...v, facturado, objetivo, avance, leadsActivos, pipeline }
+    const byStage: Record<string, number> = {}
+    for (const s of STAGES) byStage[s] = myLeads.filter(l => l.estado === s).length
+    return { ...v, facturado, objetivo, avance, leadsActivos, pipeline, byStage }
   }) ?? []
 
   const totalFact = stats.reduce((s, v) => s + v.facturado, 0)
@@ -88,7 +100,7 @@ export default async function GerentePage() {
                 <div style={{ height: '100%', width: `${v.avance}%`, background: v.avance >= 100 ? '#15803d' : 'var(--orange)', borderRadius: 4 }} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               {[
                 { label: 'Leads activos', value: v.leadsActivos },
                 { label: 'Pipeline', value: fmt(v.pipeline) },
@@ -96,6 +108,14 @@ export default async function GerentePage() {
                 <div key={s.label} style={{ background: 'var(--bg-app)', borderRadius: 6, padding: '8px 12px' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 3 }}>{s.label}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+              {STAGES.map(s => (
+                <div key={s} style={{ background: 'var(--bg-app)', borderRadius: 5, padding: '5px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{STAGE_LABELS[s]}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: v.byStage[s] > 0 ? STAGE_COLORS[s] : 'var(--text-muted)', flexShrink: 0 }}>{v.byStage[s]}</span>
                 </div>
               ))}
             </div>
