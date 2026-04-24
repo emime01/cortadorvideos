@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (reserva?.reserva_items?.length) {
       const conflicts: { itemId: string; busNumero: string }[] = []
 
-      for (const item of reserva.reserva_items as Array<{
+      for (const item of reserva.reserva_items as unknown as Array<{
         id: string
         soporte_id: string
         soportes: { bus_id: string | null; lado_bus: string | null } | null
