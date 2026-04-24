@@ -12,7 +12,7 @@ export default async function BusesPage() {
 
   const supabase = createServerClient()
 
-  const [busesRes, soportesRes, clientesRes, reservasRes] = await Promise.all([
+  const [busesRes, soportesRes, clientesRes, reservasRes, activasRes] = await Promise.all([
     supabase
       .from('buses')
       .select('*, clientes!buses_cliente_actual_id_fkey(nombre, empresa)')
@@ -33,6 +33,10 @@ export default async function BusesPage() {
       .select('id, numero_reserva, fecha_desde, fecha_hasta, estado, clientes(nombre, empresa), reserva_items(id, soporte_id, bus_id, soportes(nombre, tipo, bus_id, lado_bus))')
       .eq('estado', 'aprobada')
       .order('fecha_desde'),
+    supabase
+      .from('reservas')
+      .select('estado, clientes(nombre, empresa), reserva_items(soporte_id)')
+      .in('estado', ['aprobada', 'confirmada']),
   ])
 
   const soportes = soportesRes.data ?? []
@@ -49,12 +53,28 @@ export default async function BusesPage() {
     r.reserva_items.some(it => it.soportes?.tipo === 'bus' || it.soportes?.bus_id)
   )
 
+  // Build soporte_id → cliente for active (aprobada/confirmada) reservations
+  const soporteClienteMap: Record<string, { nombre: string; empresa: string | null }> = {}
+  for (const r of (activasRes.data ?? []) as unknown as Array<{
+    clientes: { nombre: string; empresa: string | null } | { nombre: string; empresa: string | null }[] | null
+    reserva_items: { soporte_id: string }[]
+  }>) {
+    const cli = Array.isArray(r.clientes) ? r.clientes[0] : r.clientes
+    if (!cli) continue
+    for (const it of r.reserva_items) {
+      if (it.soporte_id && !soporteClienteMap[it.soporte_id]) {
+        soporteClienteMap[it.soporte_id] = { nombre: cli.nombre, empresa: cli.empresa }
+      }
+    }
+  }
+
   return (
     <BusesClient
       initialBuses={buses as unknown as Parameters<typeof BusesClient>[0]['initialBuses']}
       initialSoportesSinAsignar={soportesSinAsignar}
       clientes={clientesRes.data ?? []}
       initialReservas={reservas as unknown as Parameters<typeof BusesClient>[0]['initialReservas']}
+      soporteClienteMap={soporteClienteMap}
       userRol={session.user.rol}
     />
   )

@@ -65,11 +65,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         const targetBusId = overrideMap.get(item.id) ?? item.soportes?.bus_id ?? null
         if (!targetBusId) continue
 
-        // Check if this bus has conflicting confirmed/aprobada reservations for overlapping dates
+        // Check if this soporte is already in a confirmed/aprobada reservation with overlapping dates
         const { data: conflictItems } = await supabase
           .from('reserva_items')
           .select('id, reservas!inner(id, fecha_desde, fecha_hasta, estado)')
-          .eq('bus_id', targetBusId)
+          .eq('soporte_id', item.soporte_id)
           .neq('reservas.id', params.id)
           .in('reservas.estado', ['confirmada', 'aprobada'])
           .lte('reservas.fecha_desde', reserva.fecha_hasta)

@@ -54,6 +54,7 @@ interface Props {
   initialSoportesSinAsignar: Soporte[]
   clientes: Cliente[]
   initialReservas: ReservaPendiente[]
+  soporteClienteMap: Record<string, { nombre: string; empresa: string | null }>
   userRol: string
 }
 
@@ -99,7 +100,7 @@ function Modal({ title, onClose, children, width = 560 }: { title: string; onClo
   )
 }
 
-export default function BusesClient({ initialBuses, initialSoportesSinAsignar, clientes, initialReservas, userRol }: Props) {
+export default function BusesClient({ initialBuses, initialSoportesSinAsignar, clientes, initialReservas, soporteClienteMap, userRol }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<'flota' | 'pendientes'>('flota')
   const [buses, setBuses] = useState(initialBuses)
@@ -113,10 +114,11 @@ export default function BusesClient({ initialBuses, initialSoportesSinAsignar, c
   const stats = useMemo(() => {
     const total = buses.length
     const mantenimiento = buses.filter(b => b.lado_disponible === 'ninguno').length
-    const conCampana = buses.filter(b => b.cliente_actual_id).length
+    // Un bus "con campaña" = tiene al menos un soporte con cliente activo
+    const conCampana = buses.filter(b => b.soportes.some(s => soporteClienteMap[s.id])).length
     const disponibles = total - mantenimiento - conCampana
     return { total, mantenimiento, conCampana, disponibles: Math.max(disponibles, 0) }
-  }, [buses])
+  }, [buses, soporteClienteMap])
 
   // Modals
   const [busModal, setBusModal] = useState<{ open: boolean; data: Partial<Bus> & { soporteAssignments?: { soporteId: string; ladoBus: string }[] } | null }>({ open: false, data: null })
@@ -157,6 +159,7 @@ export default function BusesClient({ initialBuses, initialSoportesSinAsignar, c
           stats={stats}
           canManage={canManage}
           clienteMap={clienteMap}
+          soporteClienteMap={soporteClienteMap}
           onEdit={(bus) => setBusModal({ open: true, data: bus })}
           onNew={() => setBusModal({ open: true, data: { lado_disponible: 'ambos' } })}
           onImport={() => setImportModal(true)}
@@ -225,12 +228,13 @@ export default function BusesClient({ initialBuses, initialSoportesSinAsignar, c
 // Sub-components defined below (FlotaTab, PendientesTab, BusModal, ImportModal, ConfirmReservaModal)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function FlotaTab({ buses, stats, canManage, clienteMap, onEdit, onNew, onImport }: {
+function FlotaTab({ buses, stats, canManage, soporteClienteMap, onEdit, onNew, onImport }: {
   buses: Bus[]
   setBuses: React.Dispatch<React.SetStateAction<Bus[]>>
   stats: { total: number; disponibles: number; conCampana: number; mantenimiento: number }
   canManage: boolean
   clienteMap: Map<string, Cliente>
+  soporteClienteMap: Record<string, { nombre: string; empresa: string | null }>
   onEdit: (bus: Bus) => void
   onNew: () => void
   onImport: () => void
@@ -267,7 +271,6 @@ function FlotaTab({ buses, stats, canManage, clienteMap, onEdit, onNew, onImport
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
         {buses.map(bus => {
           const lbl = LADO[bus.lado_disponible] ?? LADO.ninguno
-          const cliente = bus.cliente_actual_id ? clienteMap.get(bus.cliente_actual_id) : null
           return (
             <div key={bus.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, position: 'relative' }}>
               {canManage && (
@@ -284,26 +287,27 @@ function FlotaTab({ buses, stats, canManage, clienteMap, onEdit, onNew, onImport
                 {bus.categoria && <span style={{ marginLeft: 6, background: '#eef2ff', color: '#4338ca', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>{CATEGORIAS[bus.categoria] ?? bus.categoria}</span>}
               </div>
 
-              <div style={{ marginBottom: 10 }}>
+              <div>
                 {POSICIONES.map(pos => {
                   const s = bus.soportes.find(x => x.lado_bus === pos.key)
+                  const cli = s ? soporteClienteMap[s.id] : null
                   return (
-                    <div key={pos.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', borderBottom: '1px dashed #eee' }}>
+                    <div key={pos.key} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11, padding: '4px 0', borderBottom: '1px dashed #eee', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-muted)' }}>{pos.label}</span>
-                      <span style={{ color: s ? 'var(--text-primary)' : '#9ca3af', fontWeight: s ? 600 : 400 }}>{s?.nombre ?? '—'}</span>
+                      <div style={{ textAlign: 'right' }}>
+                        {s ? (
+                          <>
+                            <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.nombre}</div>
+                            {cli && <div style={{ color: 'var(--orange)', fontSize: 10, fontWeight: 600 }}>{cli.empresa ?? cli.nombre}</div>}
+                          </>
+                        ) : (
+                          <span style={{ color: '#9ca3af' }}>—</span>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
               </div>
-
-              {cliente ? (
-                <div style={{ background: 'var(--orange-pale)', borderRadius: 6, padding: '6px 10px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--orange)' }}>Cliente actual</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{cliente.empresa ?? cliente.nombre}</div>
-                </div>
-              ) : (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin cliente actual</div>
-              )}
             </div>
           )
         })}
