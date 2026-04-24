@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Search, Upload, X, Edit2, Trash2, History } from 'lucide-react'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { Plus, Search, Upload, X, Edit2, Trash2, History, Image as ImageIcon } from 'lucide-react'
 
 interface Cliente {
   id: string
@@ -16,6 +17,7 @@ interface Cliente {
   tipo_cliente: string | null
   vendedor_id: string | null
   agencia_id: string | null
+  logo_url: string | null
 }
 
 interface Agencia {
@@ -51,6 +53,8 @@ interface Props {
   initialContactos: Contacto[]
   vendedores: Vendedor[]
   userRol: string
+  supabaseUrl: string
+  supabaseAnonKey: string
 }
 
 const MESES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -77,8 +81,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-export default function CuentasClient({ initialClientes, initialAgencias, initialContactos, vendedores, userRol }: Props) {
+export default function CuentasClient({ initialClientes, initialAgencias, initialContactos, vendedores, userRol, supabaseUrl, supabaseAnonKey }: Props) {
   const router = useRouter()
+  const supabase = useMemo(() => createClient(supabaseUrl, supabaseAnonKey), [supabaseUrl, supabaseAnonKey])
   const [tab, setTab] = useState<'clientes' | 'agencias' | 'contactos'>('clientes')
   const [search, setSearch] = useState('')
   const [clientes, setClientes] = useState(initialClientes)
@@ -425,6 +430,8 @@ export default function CuentasClient({ initialClientes, initialAgencias, initia
           data={clienteModal.data ?? {}}
           vendedores={vendedores}
           agencias={agencias}
+          supabase={supabase}
+          supabaseUrl={supabaseUrl}
           onClose={() => setClienteModal({ open: false, data: null })}
           onSave={saveCliente}
           saving={saving}
@@ -500,15 +507,78 @@ export default function CuentasClient({ initialClientes, initialAgencias, initia
 
 // ─── Sub-forms ────────────────────────────────────────────────────────────────
 
-function ClienteModalForm({ data, vendedores, agencias, onClose, onSave, saving, error }: {
+function ClienteModalForm({ data, vendedores, agencias, supabase, supabaseUrl, onClose, onSave, saving, error }: {
   data: Partial<Cliente>; vendedores: Vendedor[]; agencias: Agencia[]
+  supabase: SupabaseClient; supabaseUrl: string
   onClose: () => void; onSave: (d: Partial<Cliente>) => void; saving: boolean; error: string
 }) {
   const [form, setForm] = useState(data)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoError, setLogoError] = useState('')
+  const logoInputRef = useRef<HTMLInputElement | null>(null)
   const set = (k: keyof Cliente, v: unknown) => setForm(p => ({ ...p, [k]: v }))
+
+  async function handleLogoUpload(file: File) {
+    setLogoError('')
+    setUploadingLogo(true)
+    try {
+      const ext = (file.name.split('.').pop() ?? 'png').toLowerCase()
+      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const path = form.id ? `${form.id}/${fileName}` : `nuevo/${fileName}`
+      const { error: upErr } = await supabase.storage.from('logos').upload(path, file, { upsert: false, contentType: file.type })
+      if (upErr) { setLogoError(upErr.message); return }
+      const publicUrl = `${supabaseUrl}/storage/v1/object/public/logos/${path}`
+      set('logo_url', publicUrl)
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
   return (
     <Modal title={form.id ? 'Editar cliente' : 'Nuevo cliente'} onClose={onClose}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+        {/* Logo */}
+        <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 72, height: 72, borderRadius: 10, border: '1px solid var(--border)', background: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+            {form.logo_url ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={form.logo_url} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            ) : (
+              <ImageIcon size={28} color="#9a9895" />
+            )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Logo del cliente</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploadingLogo}
+                style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: '#fff', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                <Upload size={12} /> {uploadingLogo ? 'Subiendo...' : form.logo_url ? 'Cambiar' : 'Subir'}
+              </button>
+              {form.logo_url && (
+                <button
+                  type="button"
+                  onClick={() => set('logo_url', null)}
+                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: '#fff', fontSize: 12, cursor: 'pointer', color: '#c82f2f' }}
+                >
+                  Quitar
+                </button>
+              )}
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }}
+              />
+            </div>
+            {logoError && <div style={{ color: '#c82f2f', fontSize: 11 }}>{logoError}</div>}
+          </div>
+        </div>
+
         <div style={{ gridColumn: '1/-1' }}>
           <label style={labelStyle}>Nombre *</label>
           <input style={inputStyle} value={form.nombre ?? ''} onChange={e => set('nombre', e.target.value)} placeholder="Nombre del cliente" />

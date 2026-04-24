@@ -18,7 +18,7 @@ export default async function CuentasPage() {
   const [clientesRes, agenciasRes, contactosRes, vendedoresRes] = await Promise.all([
     supabase
       .from('clientes')
-      .select('id, nombre, empresa, email, telefono, rut, activo, tipo_cliente, vendedor_id, agencia_id')
+      .select('id, nombre, empresa, email, telefono, rut, activo, tipo_cliente, vendedor_id, agencia_id, logo_url')
       .order('nombre'),
     supabase
       .from('agencias')
@@ -44,6 +44,8 @@ export default async function CuentasPage() {
       initialContactos={contactosRes.data ?? []}
       vendedores={vendedoresRes.data ?? []}
       userRol={session.user.rol}
+      supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!}
+      supabaseAnonKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}
     />
   )
 }

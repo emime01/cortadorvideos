@@ -7,6 +7,13 @@ export const dynamic = 'force-dynamic'
 // Long timeout for video generation
 export const maxDuration = 300
 
+// Assets fijos del comprobante. Se esperan subidos al bucket público `assets`
+// con estos paths (ver supabase/migration_v5_logo_y_comprobante_remotion.sql):
+//   comprobantes/intro.mp4
+//   comprobantes/outro.mp4
+const INTRO_PATH = 'comprobantes/intro.mp4'
+const OUTRO_PATH = 'comprobantes/outro.mp4'
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -19,12 +26,12 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient()
 
-  // Fetch reserva + registros
+  // Fetch reserva + items + logo del cliente
   const { data: reserva } = await supabase
     .from('reservas')
     .select(`
       id, fecha_desde, fecha_hasta,
-      clientes(nombre, empresa),
+      clientes(nombre, empresa, logo_url),
       reserva_items(
         soporte_id,
         soportes(id, nombre, es_digital)
@@ -37,9 +44,13 @@ export async function POST(req: NextRequest) {
 
   const cli = Array.isArray(reserva.clientes) ? reserva.clientes[0] : reserva.clientes
   const clienteNombre = cli?.empresa ?? cli?.nombre ?? 'Cliente'
+  const logoUrl: string | null = cli?.logo_url ?? null
   const numeroCampana = reserva_id.slice(0, 8)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const storageBase = `${supabaseUrl}/storage/v1/object/public/registros`
+  const registrosBase = `${supabaseUrl}/storage/v1/object/public/registros`
+  const assetsBase = `${supabaseUrl}/storage/v1/object/public/assets`
+  const introUrl = `${assetsBase}/${INTRO_PATH}`
+  const outroUrl = `${assetsBase}/${OUTRO_PATH}`
 
   const items = (reserva.reserva_items as unknown as Array<{
     soporte_id: string
@@ -59,19 +70,27 @@ export async function POST(req: NextRequest) {
   const videoRegistros = (registros ?? []).filter(r => r.tipo === 'video')
   const fotoRegistros  = (registros ?? []).filter(r => r.tipo === 'foto')
 
+  if (videoRegistros.length === 0 && fotoRegistros.length === 0) {
+    return NextResponse.json({ error: 'No hay registros subidos para esta reserva' }, { status: 400 })
+  }
+
   const generated: { tipo: string; path: string }[] = []
+  const errors: { tipo: string; message: string }[] = []
 
   // ── Video comprobante ─────────────────────────────────────────────────────
   if (videoRegistros.length > 0) {
-    const { generateVideoComprobante } = await import('@/lib/comprobantes/video')
-    const clips = videoRegistros.map(r => ({
-      url: `${storageBase}/${r.storage_path}`,
-      soporteNombre: soporteMap.get(r.soporte_id)?.nombre ?? r.soporte_id,
-    }))
-
     try {
+      const { generateVideoComprobante } = await import('@/lib/comprobantes/video')
+      const clips = videoRegistros.map(r => ({
+        url: `${registrosBase}/${r.storage_path}`,
+        soporteNombre: soporteMap.get(r.soporte_id)?.nombre ?? r.soporte_id,
+      }))
+
       const buffer = await generateVideoComprobante({
         cliente: clienteNombre,
+        logoUrl,
+        introUrl,
+        outroUrl,
         numeroCampana,
         fechaDesde: reserva.fecha_desde,
         fechaHasta: reserva.fecha_hasta,
@@ -79,23 +98,26 @@ export async function POST(req: NextRequest) {
       })
 
       const videoPath = `${reserva_id}/video_${Date.now()}.mp4`
-      await supabase.storage.from('comprobantes').upload(videoPath, buffer, { contentType: 'video/mp4', upsert: true })
+      const { error: upErr } = await supabase.storage.from('comprobantes').upload(videoPath, buffer, { contentType: 'video/mp4', upsert: true })
+      if (upErr) throw new Error(`Upload falló: ${upErr.message}`)
       generated.push({ tipo: 'video', path: videoPath })
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       console.error('Video generation error:', err)
+      errors.push({ tipo: 'video', message: msg })
     }
   }
 
   // ── PDF comprobante ───────────────────────────────────────────────────────
   if (fotoRegistros.length > 0) {
-    const { generatePdfComprobante } = await import('@/lib/comprobantes/pdf')
-    const fotos = fotoRegistros.map(r => ({
-      url: `${storageBase}/${r.storage_path}`,
-      soporteNombre: soporteMap.get(r.soporte_id)?.nombre ?? r.soporte_id,
-      fechaRegistro: r.fecha_registro,
-    }))
-
     try {
+      const { generatePdfComprobante } = await import('@/lib/comprobantes/pdf')
+      const fotos = fotoRegistros.map(r => ({
+        url: `${registrosBase}/${r.storage_path}`,
+        soporteNombre: soporteMap.get(r.soporte_id)?.nombre ?? r.soporte_id,
+        fechaRegistro: r.fecha_registro,
+      }))
+
       const buffer = await generatePdfComprobante({
         cliente: clienteNombre,
         numeroCampana,
@@ -105,15 +127,19 @@ export async function POST(req: NextRequest) {
       })
 
       const pdfPath = `${reserva_id}/comprobante_${Date.now()}.pdf`
-      await supabase.storage.from('comprobantes').upload(pdfPath, buffer, { contentType: 'application/pdf', upsert: true })
+      const { error: upErr } = await supabase.storage.from('comprobantes').upload(pdfPath, buffer, { contentType: 'application/pdf', upsert: true })
+      if (upErr) throw new Error(`Upload falló: ${upErr.message}`)
       generated.push({ tipo: 'pdf', path: pdfPath })
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       console.error('PDF generation error:', err)
+      errors.push({ tipo: 'pdf', message: msg })
     }
   }
 
   if (generated.length === 0) {
-    return NextResponse.json({ error: 'No hay registros para generar comprobante' }, { status: 400 })
+    const detail = errors.map(e => `${e.tipo}: ${e.message}`).join(' | ') || 'Error desconocido'
+    return NextResponse.json({ error: `Error generando comprobante — ${detail}` }, { status: 500 })
   }
 
   const publicBase = `${supabaseUrl}/storage/v1/object/public/comprobantes`
@@ -123,5 +149,6 @@ export async function POST(req: NextRequest) {
       tipo: g.tipo,
       url: `${publicBase}/${g.path}`,
     })),
+    errors: errors.length > 0 ? errors : undefined,
   })
 }

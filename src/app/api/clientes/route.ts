@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const includeInactivo = searchParams.get('all') === 'true'
   const supabase = createServerClient()
-  let query = supabase.from('clientes').select('id, nombre, empresa, email, telefono, rut, notas, activo, tipo_cliente, vendedor_id, agencia_id, perfiles!clientes_vendedor_id_fkey(nombre)').order('nombre')
+  let query = supabase.from('clientes').select('id, nombre, empresa, email, telefono, rut, notas, activo, tipo_cliente, vendedor_id, agencia_id, logo_url, perfiles!clientes_vendedor_id_fkey(nombre)').order('nombre')
   if (!includeInactivo) query = query.eq('activo', true) as typeof query
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
