@@ -16,7 +16,7 @@ export default async function RegistrosPage() {
     supabase
       .from('reservas')
       .select(`
-        id, numero_reserva, fecha_desde, fecha_hasta, estado,
+        id, fecha_desde, fecha_hasta, estado,
         clientes(id, nombre, empresa),
         reserva_items(
           id, soporte_id,

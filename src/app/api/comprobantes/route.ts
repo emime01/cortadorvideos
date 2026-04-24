@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const { data: reserva } = await supabase
     .from('reservas')
     .select(`
-      id, numero_reserva, fecha_desde, fecha_hasta,
+      id, fecha_desde, fecha_hasta,
       clientes(nombre, empresa),
       reserva_items(
         soporte_id,
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const cli = Array.isArray(reserva.clientes) ? reserva.clientes[0] : reserva.clientes
   const clienteNombre = cli?.empresa ?? cli?.nombre ?? 'Cliente'
-  const numeroCampana = reserva.numero_reserva ?? reserva_id.slice(0, 8)
+  const numeroCampana = reserva_id.slice(0, 8)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const storageBase = `${supabaseUrl}/storage/v1/object/public/registros`
 

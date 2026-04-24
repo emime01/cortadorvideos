@@ -8,7 +8,6 @@ interface SoporteInfo { id: string; nombre: string; tipo: string | null; es_digi
 interface ReservaItem { id: string; soporte_id: string; soportes: SoporteInfo | null }
 interface Reserva {
   id: string
-  numero_reserva: string | null
   fecha_desde: string
   fecha_hasta: string
   estado: string
@@ -182,7 +181,7 @@ export default function RegistrosClient({ reservas, userId, userRol, supabaseUrl
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa', flexWrap: 'wrap', gap: 8 }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>
-                    {reserva.numero_reserva ?? reserva.id.slice(0, 8)}
+                    {reserva.id.slice(0, 8).toUpperCase()}
                   </span>
                   <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--text-muted)' }}>
                     {fmtFecha(reserva.fecha_desde)} → {fmtFecha(reserva.fecha_hasta)}
