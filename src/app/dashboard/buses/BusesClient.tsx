@@ -253,9 +253,12 @@ function FlotaTab({ buses, stats, canManage, soporteClienteMap, onEdit, onNew, o
 }) {
   const [filterCliente, setFilterCliente] = useState('')
   const [filterSoporte, setFilterSoporte] = useState('')
+  const [filterDisp, setFilterDisp] = useState<'todos' | 'disponibles' | 'no_disponibles'>('todos')
 
   const busesFiltrados = useMemo(() => {
     let list = buses
+    if (filterDisp === 'disponibles') list = list.filter(b => parseLados(b.lado_disponible).length > 0)
+    if (filterDisp === 'no_disponibles') list = list.filter(b => parseLados(b.lado_disponible).length === 0)
     if (filterCliente) {
       const q = filterCliente.toLowerCase()
       list = list.filter(b => b.soportes.some(s => {
@@ -268,7 +271,7 @@ function FlotaTab({ buses, stats, canManage, soporteClienteMap, onEdit, onNew, o
       list = list.filter(b => b.soportes.some(s => s.nombre.toLowerCase().includes(q)))
     }
     return list
-  }, [buses, filterCliente, filterSoporte, soporteClienteMap])
+  }, [buses, filterCliente, filterSoporte, filterDisp, soporteClienteMap])
 
   const statsList = [
     { label: 'Total flota',   value: stats.total,        color: 'var(--text-primary)' },
@@ -279,18 +282,27 @@ function FlotaTab({ buses, stats, canManage, soporteClienteMap, onEdit, onNew, o
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select
+          value={filterDisp}
+          onChange={e => setFilterDisp(e.target.value as 'todos' | 'disponibles' | 'no_disponibles')}
+          style={{ ...inputStyle, width: 160 }}
+        >
+          <option value="todos">Todos</option>
+          <option value="disponibles">Disponibles</option>
+          <option value="no_disponibles">No disponibles</option>
+        </select>
         <input
           placeholder="Filtrar por cliente..."
           value={filterCliente}
           onChange={e => setFilterCliente(e.target.value)}
-          style={{ ...inputStyle, width: 200 }}
+          style={{ ...inputStyle, width: 190 }}
         />
         <input
           placeholder="Filtrar por soporte..."
           value={filterSoporte}
           onChange={e => setFilterSoporte(e.target.value)}
-          style={{ ...inputStyle, width: 200 }}
+          style={{ ...inputStyle, width: 190 }}
         />
         <div style={{ flex: 1 }} />
         {canManage && (

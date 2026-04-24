@@ -8,7 +8,7 @@ import {
   Users, Target, Star, Wrench, Truck, Monitor,
   Palette, Receipt, AlertCircle, Percent, Building2,
   CreditCard, Settings, MessageCircle, X, Send,
-  FlaskConical, Package, BookUser,
+  FlaskConical, Package, BookUser, Camera,
 } from 'lucide-react'
 
 type Rol = 'vendedor' | 'asistente_ventas' | 'gerente_comercial' | 'operaciones' | 'arte' | 'administracion'
@@ -22,15 +22,15 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <Home size={16} />, roles: ['vendedor', 'asistente_ventas', 'gerente_comercial'] },
-  { href: '/dashboard/ventas', label: 'Ventas', icon: <FileText size={16} />, roles: ['vendedor', 'asistente_ventas', 'gerente_comercial'] },
+  { href: '/dashboard/ventas', label: 'Ventas', icon: <FileText size={16} />, roles: ['vendedor', 'asistente_ventas', 'gerente_comercial', 'operaciones'] },
   { href: '/dashboard/leads', label: 'Leads', icon: <Filter size={16} />, roles: ['vendedor', 'asistente_ventas', 'gerente_comercial'] },
   { href: '/dashboard/disponibilidad', label: 'Disponibilidad', icon: <Calendar size={16} />, roles: ['vendedor', 'asistente_ventas', 'gerente_comercial', 'operaciones', 'administracion'] },
   { href: '/dashboard/reportes', label: 'Reportes', icon: <BarChart2 size={16} />, roles: ['vendedor', 'asistente_ventas', 'gerente_comercial', 'administracion'] },
   { href: '/dashboard/cuentas', label: 'Cuentas', icon: <BookUser size={16} />, roles: ['vendedor', 'asistente_ventas', 'gerente_comercial', 'administracion'] },
   { href: '/dashboard/gerente', label: 'Mi Equipo', icon: <Users size={16} />, roles: ['gerente_comercial', 'administracion'] },
   { href: '/dashboard/gerente/objetivos', label: 'Objetivos', icon: <Target size={16} />, roles: ['asistente_ventas'] },
-  { href: '/dashboard/oic', label: 'OIC', icon: <Wrench size={16} />, roles: ['operaciones'] },
   { href: '/dashboard/buses', label: 'Buses', icon: <Truck size={16} />, roles: ['operaciones', 'administracion'] },
+  { href: '/dashboard/registros', label: 'Registros', icon: <Camera size={16} />, roles: ['operaciones', 'administracion', 'vendedor', 'asistente_ventas', 'gerente_comercial'] },
   { href: '/dashboard/arte', label: 'Planilla digital', icon: <Monitor size={16} />, roles: ['arte'] },
   { href: '/dashboard/arte/colores', label: 'Muestras de color', icon: <Palette size={16} />, roles: ['arte'] },
   { href: '/dashboard/admin/facturacion', label: 'Facturación', icon: <Receipt size={16} />, roles: ['administracion'] },
@@ -53,8 +53,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/gerente': 'Mi Equipo',
   '/dashboard/gerente/objetivos': 'Objetivos',
   '/dashboard/gerente/ceo': 'Dashboard CEO',
-  '/dashboard/oic': 'OIC',
   '/dashboard/buses': 'Buses',
+  '/dashboard/registros': 'Registros',
   '/dashboard/arte': 'Planilla Digital',
   '/dashboard/arte/colores': 'Muestras de Color',
   '/dashboard/admin/facturacion': 'Facturación',
