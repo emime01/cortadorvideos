@@ -22,13 +22,27 @@ export interface VideoComprobante {
 }
 
 const DEFAULT_CHROMIUM_PACK_URL =
-  'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.x64.tar'
+  'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar'
 
 let cachedBundle: string | null = null
 let cachedExecutablePath: string | null | undefined
 
 async function getBundle(): Promise<string> {
   if (cachedBundle) return cachedBundle
+
+  // Production: usar el bundle pre-armado en `next build` (scripts/build-remotion.mjs)
+  // para evitar correr webpack durante un cold start de la función.
+  const prebuiltDir = path.resolve(process.cwd(), '.remotion-bundle')
+  const hasPrebuilt = await fs
+    .stat(prebuiltDir)
+    .then(s => s.isDirectory())
+    .catch(() => false)
+  if (hasPrebuilt) {
+    cachedBundle = prebuiltDir
+    return cachedBundle
+  }
+
+  // Dev fallback: bundlear en runtime.
   const entryPoint = path.resolve(process.cwd(), 'src/remotion/index.ts')
   cachedBundle = await bundle({
     entryPoint,

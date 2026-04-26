@@ -12,7 +12,13 @@ const nextConfig = {
     // Asegurar que las composiciones de Remotion (que se bundlean en runtime
     // con el bundler dentro de la API route) viajen al deploy serverless.
     outputFileTracingIncludes: {
-      '/api/comprobantes': ['./src/remotion/**/*'],
+      '/api/comprobantes': [
+        // Bundle pre-armado en build (scripts/build-remotion.mjs) — evita correr
+        // webpack en runtime durante el cold start.
+        './.remotion-bundle/**/*',
+        // Fallback por si el bundle pre-armado no está y hay que bundlear runtime.
+        './src/remotion/**/*',
+      ],
     },
   },
 }
