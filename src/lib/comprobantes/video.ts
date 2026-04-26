@@ -21,7 +21,11 @@ export interface VideoComprobante {
   clips: VideoClip[]
 }
 
+const DEFAULT_CHROMIUM_PACK_URL =
+  'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.x64.tar'
+
 let cachedBundle: string | null = null
+let cachedExecutablePath: string | null | undefined
 
 async function getBundle(): Promise<string> {
   if (cachedBundle) return cachedBundle
@@ -34,12 +38,28 @@ async function getBundle(): Promise<string> {
   return cachedBundle
 }
 
+async function getBrowserExecutable(): Promise<string | null> {
+  if (cachedExecutablePath !== undefined) return cachedExecutablePath
+  const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+  if (!isServerless) {
+    cachedExecutablePath = null
+    return null
+  }
+  const chromium = (await import('@sparticuz/chromium-min')).default
+  const packUrl = process.env.CHROMIUM_PACK_URL ?? DEFAULT_CHROMIUM_PACK_URL
+  cachedExecutablePath = await chromium.executablePath(packUrl)
+  return cachedExecutablePath
+}
+
 export async function generateVideoComprobante(data: VideoComprobante): Promise<Buffer> {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'comprobante-'))
   const outputPath = path.join(tmpDir, 'output.mp4')
 
   try {
-    const serveUrl = await getBundle()
+    const [serveUrl, browserExecutable] = await Promise.all([
+      getBundle(),
+      getBrowserExecutable(),
+    ])
 
     const inputProps: ComprobanteProps = {
       cliente: data.cliente,
@@ -55,6 +75,7 @@ export async function generateVideoComprobante(data: VideoComprobante): Promise<
       serveUrl,
       id: 'Comprobante',
       inputProps,
+      browserExecutable,
     })
 
     await renderMedia({
@@ -63,10 +84,9 @@ export async function generateVideoComprobante(data: VideoComprobante): Promise<
       codec: 'h264',
       outputLocation: outputPath,
       inputProps,
-      chromiumOptions: {
-        // En Vercel/serverless, setear CHROMIUM_EXECUTABLE_PATH apuntando a
-        // @sparticuz/chromium-min o similar. Localmente usa el Chrome del sistema.
-      },
+      browserExecutable,
+      // Mantener bajo el uso de memoria en serverless
+      concurrency: 1,
     })
 
     const buffer = await fs.readFile(outputPath)
